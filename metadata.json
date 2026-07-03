@@ -1,5 +1,5 @@
 {
-  "name": "Moliya",
+  "name": "SmartBudget",
   "description": "Shaxsiy moliya va xarajatlar nazorati ilovasi",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

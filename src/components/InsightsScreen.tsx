@@ -46,6 +46,22 @@ const CATEGORY_COLORS: { [key: string]: string } = {
   'Boshqa': '#6b7280' // gray
 };
 
+const formatChartYAxis = (value: number) => {
+  if (value === 0) return '0';
+  const absVal = Math.abs(value);
+  const sign = value < 0 ? '-' : '';
+  if (absVal >= 1e9) {
+    return `${sign}${(absVal / 1e9).toFixed(1).replace(/\.0$/, '')} mlrd`;
+  }
+  if (absVal >= 1e6) {
+    return `${sign}${(absVal / 1e6).toFixed(1).replace(/\.0$/, '')} mln`;
+  }
+  if (absVal >= 1e3) {
+    return `${sign}${(absVal / 1e3).toFixed(0)}K`;
+  }
+  return `${sign}${absVal}`;
+};
+
 export const InsightsScreen: React.FC<InsightsScreenProps> = ({ transactions, currency }) => {
   const [timeRange, setTimeRange] = useState<'7days' | 'all'>('7days');
 
@@ -230,7 +246,7 @@ export const InsightsScreen: React.FC<InsightsScreenProps> = ({ transactions, cu
 
         <div className="h-60 w-full text-xs">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 10, right: 5, left: -25, bottom: 0 }}>
+            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
               <defs>
                 <linearGradient id="colorKirim" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
@@ -243,7 +259,7 @@ export const InsightsScreen: React.FC<InsightsScreenProps> = ({ transactions, cu
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(156,163,175,0.1)" />
               <XAxis dataKey="date" tickLine={false} axisLine={false} stroke="#9ca3af" />
-              <YAxis tickLine={false} axisLine={false} stroke="#9ca3af" />
+              <YAxis tickLine={false} axisLine={false} stroke="#9ca3af" tickFormatter={formatChartYAxis} width={50} />
               <Tooltip content={<CustomTooltip />} />
               <Area type="monotone" dataKey="kirim" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#colorKirim)" name="kirim" />
               <Area type="monotone" dataKey="chiqim" stroke="#f43f5e" strokeWidth={2.5} fillOpacity={1} fill="url(#colorChiqim)" name="chiqim" />

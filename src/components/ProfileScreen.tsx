@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useRef } from 'react';
-import { UserProfile } from '../types';
+import { UserProfile, Transaction } from '../types';
 import { 
   User, 
   Mail, 
@@ -16,8 +16,18 @@ import {
   Check, 
   Sparkles,
   Camera,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Bell,
+  BellOff,
+  MessageSquare,
+  Clock,
+  Send
 } from 'lucide-react';
+import { 
+  triggerInstantNotification, 
+  scheduleDailyReminder, 
+  isNativePlatform 
+} from '../lib/notifications';
 
 const PRESET_AVATARS = [
   {
@@ -89,6 +99,30 @@ const resizeAndConvertImage = (file: File): Promise<string> => {
   });
 };
 
+export const formatUzbekPhone = (value: string): string => {
+  const digits = value.replace(/\D/g, '');
+  let localDigits = digits;
+  if (digits.startsWith('998')) {
+    localDigits = digits.substring(3);
+  }
+  const truncated = localDigits.slice(0, 9);
+  
+  let formatted = '';
+  if (truncated.length > 0) {
+    formatted += truncated.slice(0, 2);
+  }
+  if (truncated.length > 2) {
+    formatted += ' ' + truncated.slice(2, 5);
+  }
+  if (truncated.length > 5) {
+    formatted += ' ' + truncated.slice(5, 7);
+  }
+  if (truncated.length > 7) {
+    formatted += ' ' + truncated.slice(7, 9);
+  }
+  return formatted;
+};
+
 interface ProfileScreenProps {
   profile: UserProfile;
   baseBalance: number;
@@ -97,6 +131,9 @@ interface ProfileScreenProps {
   onResetData: () => void;
   onImportData: (transactionsJson: string, profileJson?: string) => boolean;
   transactionsJson: string; // For export
+  transactions: Transaction[];
+  currentBalance: number;
+  onShowWebToast: (msg: string) => void;
 }
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
@@ -106,7 +143,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   onUpdateBaseBalance,
   onResetData,
   onImportData,
-  transactionsJson
+  transactionsJson,
+  transactions,
+  currentBalance,
+  onShowWebToast
 }) => {
   const [name, setName] = useState(profile.name);
   const [email, setEmail] = useState(profile.email);
@@ -114,6 +154,20 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const [currency, setCurrency] = useState(profile.currency);
   const [monthlyBudget, setMonthlyBudget] = useState(profile.monthlyBudget?.toString() || '');
   const [balanceInput, setBalanceInput] = useState(baseBalance.toString());
+  const [notificationsEnabled, setNotificationsEnabled] = useState(profile.notificationsEnabled ?? true);
+  const [notificationTime, setNotificationTime] = useState(profile.notificationTime || '20:00');
+
+  // Parse initial local phone digits
+  const getInitialPhoneDigits = (rawPhone?: string): string => {
+    if (!rawPhone) return '';
+    const digits = rawPhone.replace(/\D/g, '');
+    if (digits.startsWith('998')) {
+      return formatUzbekPhone(digits.substring(3));
+    }
+    return formatUzbekPhone(digits);
+  };
+
+  const [phoneDigits, setPhoneDigits] = useState(getInitialPhoneDigits(profile.phoneNumber));
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [importError, setImportError] = useState('');
   const [importSuccess, setImportSuccess] = useState(false);
@@ -179,7 +233,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       email: email.trim() || 'user@moliya.uz',
       avatarUrl: avatarUrl,
       currency: currency.trim() || 'UZS',
-      monthlyBudget: monthlyBudget ? parseFloat(monthlyBudget) : undefined
+      monthlyBudget: monthlyBudget ? parseFloat(monthlyBudget) : undefined,
+      notificationsEnabled,
+      notificationTime,
+      phoneNumber: phoneDigits.trim() ? `+998${phoneDigits.replace(/\s/g, '')}` : ''
     };
 
     const parsedBalance = parseFloat(balanceInput);
@@ -188,6 +245,16 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     }
 
     onUpdateProfile(updatedProfile);
+
+    // Reschedule local reminder
+    scheduleDailyReminder(
+      notificationTime,
+      notificationsEnabled,
+      transactions,
+      parsedBalance || baseBalance,
+      currency.trim() || 'UZS'
+    );
+
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 2500);
   };

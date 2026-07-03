@@ -10,7 +10,9 @@ import {
   ChevronRight,
   BookOpen,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  Code2,
+  Send
 } from 'lucide-react';
 
 export const AboutScreen: React.FC = () => {
@@ -147,6 +149,56 @@ export const AboutScreen: React.FC = () => {
             <span>Rasmingizni yangilang — shaxsiy brendingiz va kayfiyatingizga mos fotosurat yoki chiroyli tayyor rangli dizaynni tanlang.</span>
           </li>
         </ul>
+      </div>
+
+      {/* Dasturchi / Yaratuvchi ma'lumoti */}
+      <div className="bg-gradient-to-br from-indigo-500/10 via-primary/5 to-sky-500/5 dark:from-indigo-950/20 dark:via-primary-container/10 dark:to-sky-950/20 border border-indigo-500/15 dark:border-white/10 rounded-2xl p-5 shadow-sm space-y-4 text-center relative overflow-hidden">
+        {/* Decorative background elements */}
+        <div className="absolute -right-6 -bottom-6 text-indigo-500/10 dark:text-indigo-400/5 transform -rotate-12 pointer-events-none">
+          <Code2 size={120} />
+        </div>
+        <div className="absolute -left-4 -top-4 text-sky-500/10 dark:text-sky-400/5 transform rotate-45 pointer-events-none">
+          <Sparkles size={60} />
+        </div>
+        
+        <div className="flex flex-col items-center space-y-3 relative z-10">
+          {/* Avatar-like Badge */}
+          <div className="relative">
+            <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-indigo-600 to-sky-500 text-white flex items-center justify-center font-black text-lg shadow-md ring-4 ring-indigo-500/10 dark:ring-white/5">
+              BM
+            </div>
+            <span className="absolute -bottom-1 -right-1 bg-yellow-400 text-white p-1 rounded-full shadow-sm">
+              <Sparkles size={10} className="fill-current" />
+            </span>
+          </div>
+
+          <div className="space-y-1 max-w-sm">
+            <span className="inline-block text-[9px] font-extrabold uppercase tracking-widest text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/20 px-2.5 py-1 rounded-full border border-indigo-500/10">
+              LOYIHA MUALLIFI
+            </span>
+            <h4 className="text-base font-extrabold text-gray-800 dark:text-white pt-1">
+              Begimov Muhammadyusuf
+            </h4>
+            <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed font-medium">
+              Ushbu mukammal tizim va uning barcha imkoniyatlari u tomonidan yaratilgan.
+            </p>
+          </div>
+        </div>
+
+        <div className="border-t border-gray-150 dark:border-white/5 pt-3.5 flex flex-col items-center justify-center space-y-2 relative z-10">
+          <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider flex items-center gap-1">
+            <Send size={10} className="text-sky-500" /> Bog'lanish uchun
+          </span>
+          <a
+            href="https://t.me/Yusu1F_m1"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-600 hover:to-indigo-600 text-white px-5 py-2 rounded-xl text-xs font-bold transition-all duration-200 active:scale-95 shadow-md shadow-sky-500/15"
+          >
+            <Send size={13} className="-rotate-45" />
+            <span>@Yusu1F_m1</span>
+          </a>
+        </div>
       </div>
 
       {/* Quote / Footer decoration */}

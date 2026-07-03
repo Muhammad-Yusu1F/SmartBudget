@@ -36,4 +36,7 @@ export interface UserProfile {
   avatarUrl: string;
   currency: string; // e.g., '$' or 'UZS'
   monthlyBudget?: number;
+  notificationsEnabled?: boolean;
+  notificationTime?: string; // HH:MM format, e.g., '20:00'
+  phoneNumber?: string; // User's phone number for SMS notifications, e.g., '+998901234567'
 }
