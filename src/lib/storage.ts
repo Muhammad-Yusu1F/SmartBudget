@@ -25,9 +25,9 @@ import { Transaction, UserProfile } from '../types';
 const INITIAL_TRANSACTIONS: Transaction[] = [];
 
 const INITIAL_PROFILE: UserProfile = {
-  name: 'Moliya Foydalanuvchisi',
-  email: 'user@moliya.uz',
-  avatarUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuABHhVsvySzt1qlpOyl-Pm32M--AXC6vc8W-c9Ul15mCPL1WOad4XrcdPwweeAtobGHPA3zExxGqX5mVnlqmntH2AshVHqs9tHhzf4yEBY3qArq4mxzkDqIUV1-LbVv5-FXVz3GAa4-NyYPj-SoHLMjKfww_ISnvQuXnYy_AohBZk8SyRuGSacL_RBBdig5xgqfY1pX3q8bH5IZ0-GgFK_PzUJ6tiD9l4-5bS4g__dc0c7fTsBN_Chqr1NlZUZjp0w6jty8fbH6X1Wi',
+  name: 'Mehmon',
+  email: '',
+  avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80',
   currency: 'UZS',
   monthlyBudget: 0
 };

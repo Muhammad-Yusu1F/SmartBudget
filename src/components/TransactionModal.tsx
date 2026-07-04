@@ -75,9 +75,12 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   const [newItemPrice, setNewItemPrice] = useState('');
   const [showItemsEditor, setShowItemsEditor] = useState(false);
 
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
   // Update fields when editingTransaction changes
   useEffect(() => {
     setCategorySearch('');
+    setShowDeleteConfirm(false);
     if (editingTransaction) {
       setTitle(editingTransaction.title);
       setAmount(formatInput(editingTransaction.amount.toString()));
@@ -543,29 +546,55 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-3 pt-3 border-t border-gray-100 dark:border-white/5 shrink-0">
-            {editingTransaction && onDelete && (
+          {showDeleteConfirm ? (
+            <div className="bg-rose-50 dark:bg-rose-950/20 p-4 rounded-xl border border-rose-100 dark:border-rose-950/40 space-y-3 animate-in fade-in duration-200 shrink-0">
+              <p className="text-xs text-rose-600 dark:text-rose-400 font-bold text-center flex items-center justify-center gap-1.5">
+                <Trash2 size={14} className="animate-bounce" />
+                Ushbu amalni o'chirishni tasdiqlaysizmi?
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (editingTransaction && onDelete) {
+                      onDelete(editingTransaction.id);
+                      onClose();
+                    }
+                  }}
+                  className="flex-1 bg-rose-600 hover:bg-rose-700 text-white py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer active:scale-95 duration-100"
+                >
+                  Ha, o'chirilsin
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 bg-gray-200 dark:bg-white/10 hover:bg-gray-300 dark:hover:bg-white/20 text-gray-700 dark:text-gray-200 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer active:scale-95 duration-100"
+                >
+                  Yo'q, qolsin
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 pt-3 border-t border-gray-100 dark:border-white/5 shrink-0">
+              {editingTransaction && onDelete && (
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-rose-200 dark:border-rose-950/50 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-rose-600 dark:text-rose-400 text-sm font-bold transition-all cursor-pointer active:scale-95 duration-100"
+                  title="Amalni o'chirish"
+                >
+                  <Trash2 size={16} />
+                </button>
+              )}
+              
               <button
-                type="button"
-                onClick={() => {
-                  if (confirm('Ushbu amalni o\'chirishni xohlaysizmi?')) {
-                    onDelete(editingTransaction.id);
-                    onClose();
-                  }
-                }}
-                className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-rose-200 dark:border-rose-950/50 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-rose-600 dark:text-rose-400 text-sm font-bold transition-all cursor-pointer active:scale-95 duration-100"
+                type="submit"
+                className="flex-1 bg-primary dark:bg-primary-container text-white py-3 rounded-xl text-sm font-bold shadow-lg shadow-primary/10 dark:shadow-primary-container/10 hover:bg-primary/95 dark:hover:bg-primary-container/90 transition-all cursor-pointer active:scale-[0.98] duration-100 flex items-center justify-center gap-2"
               >
-                <Trash2 size={16} />
+                <span>Saqlash</span>
               </button>
-            )}
-            
-            <button
-              type="submit"
-              className="flex-1 bg-primary dark:bg-primary-container text-white py-3 rounded-xl text-sm font-bold shadow-lg shadow-primary/10 dark:shadow-primary-container/10 hover:bg-primary/95 dark:hover:bg-primary-container/90 transition-all cursor-pointer active:scale-[0.98] duration-100 flex items-center justify-center gap-2"
-            >
-              <span>Saqlash</span>
-            </button>
-          </div>
+            </div>
+          )}
 
         </form>
       </div>

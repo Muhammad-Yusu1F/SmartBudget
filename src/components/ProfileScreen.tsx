@@ -173,6 +173,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const [importSuccess, setImportSuccess] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [isDragging, setIsDragging] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -587,19 +588,48 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           </label>
         </div>
 
-        {/* Master reset database */}
-        <button
-          onClick={() => {
-            if (confirm('Barcha ma\'lumotlarni o\'chirib, ilovani boshlang\'ich holatga qaytarishni xohlaysizmi? Bu amalni ortga qaytarib bo\'lmaydi!')) {
-              onResetData();
-              window.location.reload();
-            }
-          }}
-          className="w-full flex items-center justify-center gap-2 border border-rose-200 hover:bg-rose-50 dark:border-rose-950/30 dark:hover:bg-rose-950/20 text-rose-600 dark:text-rose-400 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95 duration-100"
-        >
-          <Trash2 size={14} />
-          <span>Barcha ma'lumotlarni tozalash</span>
-        </button>
+        {/* Master reset database with custom inline confirm */}
+        {showResetConfirm ? (
+          <div className="bg-rose-50 dark:bg-rose-950/25 p-4 rounded-xl border border-rose-100 dark:border-rose-950/40 space-y-3.5 animate-in fade-in duration-200">
+            <div className="text-center space-y-1">
+              <p className="text-xs font-extrabold text-rose-600 dark:text-rose-400 flex items-center justify-center gap-1.5">
+                <Trash2 size={14} className="animate-bounce" />
+                Barcha ma'lumotlarni o'chirishni tasdiqlaysizmi?
+              </p>
+              <p className="text-[10px] text-gray-400 dark:text-gray-500 font-semibold leading-relaxed">
+                Bu amal orqali barcha kirim-chiqimlar, tranzaksiyalar va profil sozlamalari butunlay o'chib ketadi. Ushbu amalni ortga qaytarib bo'lmaydi!
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  onResetData();
+                  window.location.reload();
+                }}
+                className="flex-1 bg-rose-600 hover:bg-rose-700 text-white py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95 duration-100 shadow-sm"
+              >
+                Ha, butunlay o'chirilsin
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowResetConfirm(false)}
+                className="flex-1 bg-gray-200 dark:bg-white/10 hover:bg-gray-300 dark:hover:bg-white/20 text-gray-700 dark:text-gray-200 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95 duration-100"
+              >
+                Bekor qilish
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowResetConfirm(true)}
+            className="w-full flex items-center justify-center gap-2 border border-rose-200 hover:bg-rose-50 dark:border-rose-950/30 dark:hover:bg-rose-950/20 text-rose-600 dark:text-rose-400 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95 duration-100"
+          >
+            <Trash2 size={14} />
+            <span>Barcha ma'lumotlarni tozalash</span>
+          </button>
+        )}
       </div>
     </div>
   );

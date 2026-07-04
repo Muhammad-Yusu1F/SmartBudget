@@ -11,9 +11,20 @@ interface HeaderProps {
   onToggleTheme: () => void;
   avatarUrl: string;
   userName: string;
+  userEmail?: string;
+  onAdminClick?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ theme, onToggleTheme, avatarUrl, userName }) => {
+export const Header: React.FC<HeaderProps> = ({ 
+  theme, 
+  onToggleTheme, 
+  avatarUrl, 
+  userName,
+  userEmail,
+  onAdminClick
+}) => {
+  const isAdmin = userEmail?.toLowerCase() === 'muhayusuf105@gmail.com';
+
   return (
     <header className="fixed top-0 left-0 right-0 w-full z-50 bg-[#faf8ff] dark:bg-[#131b2e]/95 backdrop-blur-md shadow-sm border-b border-gray-100 dark:border-white/10 flex justify-between items-center px-5 h-16 transition-colors duration-200">
       {/* Left side: SmartBudget Logo and Name */}
@@ -21,9 +32,24 @@ export const Header: React.FC<HeaderProps> = ({ theme, onToggleTheme, avatarUrl,
         <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#38bdf8] to-[#0284c7] dark:from-[#0ea5e9] dark:to-[#0369a1] flex items-center justify-center shadow-md shadow-sky-500/15 dark:shadow-sky-500/5 shrink-0">
           <Wallet size={18} className="text-white" />
         </div>
-        <h1 className="text-lg sm:text-xl font-extrabold tracking-tight text-gray-900 dark:text-white">
-          SmartBudget
-        </h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-lg sm:text-xl font-extrabold tracking-tight text-gray-900 dark:text-white">
+            SmartBudget
+          </h1>
+          {isAdmin && (
+            <button
+              onClick={onAdminClick}
+              className="px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest text-teal-600 bg-teal-500/10 dark:text-teal-400 dark:bg-teal-400/10 rounded-full border border-teal-500/20 dark:border-teal-400/20 cursor-pointer hover:scale-105 active:scale-95 transition-all flex items-center gap-1.5 shrink-0"
+              title="SmartBudget Bulutli Tizim Sozlamalari"
+            >
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+              </span>
+              <span>Cloud Sync</span>
+            </button>
+          )}
+        </div>
       </div>
       
       {/* Right side: Profile details + Theme Switch */}

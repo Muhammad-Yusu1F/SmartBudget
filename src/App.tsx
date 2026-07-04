@@ -25,7 +25,8 @@ import { HistoryScreen } from './components/HistoryScreen';
 import { InsightsScreen } from './components/InsightsScreen';
 import { ProfileScreen } from './components/ProfileScreen';
 import { AboutScreen } from './components/AboutScreen';
-import { Plus, Home, ReceiptText, BarChart3, User, Grid2X2, Info } from 'lucide-react';
+import { AdminPanel } from './components/AdminPanel';
+import { Plus, Home, ReceiptText, BarChart3, User, Grid2X2, Info, CalendarDays, Calendar, Layers, X, Radio } from 'lucide-react';
 
 export default function App() {
   // Global States
@@ -36,6 +37,80 @@ export default function App() {
   
   // Navigation State
   const [activeTab, setActiveTab] = useState<'home' | 'history' | 'insights' | 'profile' | 'about'>('home');
+  
+  // Admin & Announcement states
+  const [isAdminOpen, setIsAdminOpen] = useState(false);
+  const [announcement, setAnnouncement] = useState<{ title: string; msg: string } | null>(null);
+
+  const getDeviceType = (): 'Android' | 'iOS' | 'Web' => {
+    const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+    if (/android/i.test(userAgent)) {
+      return 'Android';
+    }
+    if (/iPad|iPhone|iPod/.test(userAgent) && !(window as any).MSStream) {
+      return 'iOS';
+    }
+    return 'Web';
+  };
+
+  const loadAnnouncement = async () => {
+    try {
+      const response = await fetch('/api/announcement');
+      if (response.ok) {
+        const data = await response.json();
+        const dismissed = localStorage.getItem('admin_announcement_dismissed_title') === data.title;
+        if (data.active && data.title && data.msg && !dismissed) {
+          setAnnouncement({ title: data.title, msg: data.msg });
+        } else {
+          setAnnouncement(null);
+        }
+      }
+    } catch (err) {
+      console.error('Error loading announcement:', err);
+    }
+  };
+
+  useEffect(() => {
+    loadAnnouncement();
+    
+    const handleUpdate = () => {
+      loadAnnouncement();
+    };
+
+    window.addEventListener('admin_announcement_updated', handleUpdate);
+    return () => {
+      window.removeEventListener('admin_announcement_updated', handleUpdate);
+    };
+  }, []);
+
+  // Real-time track download on mount or profile update
+  useEffect(() => {
+    const trackUserDownload = async () => {
+      const deviceType = getDeviceType();
+      let deviceId = localStorage.getItem('moliya_device_id');
+      if (!deviceId) {
+        deviceId = 'dev-' + Math.random().toString(36).substring(2, 11);
+        localStorage.setItem('moliya_device_id', deviceId);
+      }
+
+      try {
+        await fetch('/api/track-download', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            deviceId,
+            name: profile.name || 'Mehmon',
+            email: profile.email || '',
+            device: deviceType,
+          })
+        });
+      } catch (err) {
+        console.error('Error tracking download:', err);
+      }
+    };
+
+    trackUserDownload();
+  }, [profile.name, profile.email]);
   
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -55,32 +130,112 @@ export default function App() {
 
   // Run a one-time force reset of all dynamic transaction data and balance to 0 for the user's fresh start
   useEffect(() => {
-    const isReset = localStorage.getItem('moliya_force_reset_v4');
+    const isReset = localStorage.getItem('moliya_force_reset_fresh_v5');
     if (!isReset) {
       localStorage.setItem('moliya_transactions', JSON.stringify([]));
       localStorage.setItem('moliya_base_balance', '0');
-      localStorage.setItem('moliya_force_reset_v4', 'true');
+      localStorage.removeItem('moliya_profile'); // Clear any cached legacy profiles
+      localStorage.setItem('moliya_force_reset_fresh_v5', 'true');
       setTransactions([]);
       setBaseBalance(0);
+      setProfile(getProfile()); // Sets profile back to initial clean Mehmon defaults
     }
   }, []);
 
-  // Recalculated dynamic metrics based on loaded transactions
-  const totalIncome = transactions
+  // Global Period Filter State for Homepage
+  const [dashboardPeriod, setDashboardPeriod] = useState<'bugun' | 'hafta' | 'barchasi'>('bugun');
+
+  const getLocalDateString = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const getMondayOfDate = (dateStr: string): string => {
+    const d = new Date(dateStr);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    const monday = new Date(d.setDate(diff));
+    const y = monday.getFullYear();
+    const m = String(monday.getMonth() + 1).padStart(2, '0');
+    const r = String(monday.getDate()).padStart(2, '0');
+    return `${y}-${m}-${r}`;
+  };
+
+  const getUzbekMonthName = (monthIdx: number) => {
+    const months = [
+      'Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 
+      'Iyul', 'Avgust', 'Sentyabr', 'Oktyabr', 'Noyabr', 'Dekabr'
+    ];
+    return months[monthIdx];
+  };
+
+  const getWeekRangeLabel = (mondayStr: string): string => {
+    const monday = new Date(mondayStr);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    
+    const mD = monday.getDate();
+    const mM = getUzbekMonthName(monday.getMonth());
+    const mY = monday.getFullYear();
+    
+    const sD = sunday.getDate();
+    const sM = getUzbekMonthName(sunday.getMonth());
+    const sY = sunday.getFullYear();
+    
+    if (mY !== sY) {
+      return `${mD}-${mM}, ${mY} - ${sD}-${sM}, ${sY}`;
+    }
+    if (mM !== sM) {
+      return `${mD}-${mM} - ${sD}-${sM}, ${mY}`;
+    }
+    return `${mD}-${sD} ${mM}, ${mY}-yil`;
+  };
+
+  // Recalculated dynamic metrics based on loaded transactions (All-time overall balance)
+  const allTimeIncome = transactions
     .filter((t) => t.type === 'kirim')
     .reduce((sum, t) => sum + t.amount, 0);
 
-  const totalExpense = transactions
+  const allTimeExpense = transactions
     .filter((t) => t.type === 'chiqim')
     .reduce((sum, t) => sum + t.amount, 0);
 
-  const currentBalance = baseBalance + totalIncome - totalExpense;
+  const currentBalance = baseBalance + allTimeIncome - allTimeExpense;
 
-  // Let's compute a dynamic comparison metric (e.g. income/expense ratios or fixed healthy 12.5% increase)
-  const percentageChange = transactions.length === 0 ? 0 : 12.5;
+  // Filter transactions for dashboard cards based on the selected period
+  const todayStr = getLocalDateString();
+  const currentWeekMonday = getMondayOfDate(todayStr);
+
+  const filteredTxsForPeriod = transactions.filter((t) => {
+    if (dashboardPeriod === 'bugun') {
+      return t.date === todayStr;
+    }
+    if (dashboardPeriod === 'hafta') {
+      return getMondayOfDate(t.date) === currentWeekMonday;
+    }
+    return true; // barchasi
+  });
+
+  const totalIncome = filteredTxsForPeriod
+    .filter((t) => t.type === 'kirim')
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const totalExpense = filteredTxsForPeriod
+    .filter((t) => t.type === 'chiqim')
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  // Let's compute a dynamic comparison metric
+  const percentageChange = filteredTxsForPeriod.length === 0 ? 0 : 12.5;
 
   const toggleTheme = () => {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
+
+  const showWebToast = (msg: string) => {
+    setWebToastMessage(msg);
   };
 
   // Profile updaters
@@ -143,6 +298,74 @@ export default function App() {
     setBaseBalance(getBaseBalance());
   };
 
+  const handleAddSampleTransactions = () => {
+    const todayStr = getLocalDateString();
+    const samples: Transaction[] = [
+      {
+        id: 'sample-' + Date.now() + '-1',
+        title: 'Oylik Maosh',
+        amount: 8500000,
+        type: 'kirim',
+        category: 'Maosh',
+        date: todayStr,
+        time: '10:00',
+        description: 'Kompaniya tomonidan oylik ish haqi',
+      },
+      {
+        id: 'sample-' + Date.now() + '-2',
+        title: 'Korzinka xarid',
+        amount: 345000,
+        type: 'chiqim',
+        category: 'Oziq-ovqat',
+        date: todayStr,
+        time: '12:30',
+        items: [
+          { id: 'item-s2-1', name: 'Goʻsht va sabzavotlar', price: 215000 },
+          { id: 'item-s2-2', name: 'Sut va non', price: 130000 }
+        ],
+        description: 'Haftalik oziq-ovqat zaxirasi'
+      },
+      {
+        id: 'sample-' + Date.now() + '-3',
+        title: 'Yandex Taksi',
+        amount: 45000,
+        type: 'chiqim',
+        category: 'Transport',
+        date: todayStr,
+        time: '15:15',
+        description: 'Ofisdan uyga qaytish'
+      },
+      {
+        id: 'sample-' + Date.now() + '-4',
+        title: 'Kitob doʻkoni',
+        amount: 180000,
+        type: 'chiqim',
+        category: 'Taʻlim',
+        date: todayStr,
+        time: '16:40',
+        items: [
+          { id: 'item-s4-1', name: 'Gemini AI kitobi', price: 95000 },
+          { id: 'item-s4-2', name: 'Moliya darsligi', price: 85000 }
+        ]
+      },
+      {
+        id: 'sample-' + Date.now() + '-5',
+        title: 'Freelance Loyiha',
+        amount: 1200000,
+        type: 'kirim',
+        category: 'Boshqa',
+        date: todayStr,
+        time: '18:20',
+        description: 'Veb-sayt dizayni uchun'
+      }
+    ];
+
+    const newList = [...samples, ...transactions];
+    setTransactions(newList);
+    saveTransactions(newList);
+    showWebToast("5 ta test amali muvaffaqiyatli qoʻshildi!");
+  };
+
   const handleImportData = (transactionsJson: string, profileJson?: string): boolean => {
     try {
       const parsedTxs = JSON.parse(transactionsJson);
@@ -171,14 +394,110 @@ export default function App() {
   const renderActiveScreen = () => {
     switch (activeTab) {
       case 'home':
+        const getPeriodLabel = () => {
+          if (dashboardPeriod === 'bugun') {
+            const today = new Date();
+            const days = ['Yakshanba', 'Dushanba', 'Seshanba', 'Chorshanba', 'Payshanba', 'Juma', 'Shanba'];
+            return `Kunlik: ${today.getDate()}-${getUzbekMonthName(today.getMonth())}, ${days[today.getDay()]}`;
+          }
+          if (dashboardPeriod === 'hafta') {
+            return `Haftalik: ${getWeekRangeLabel(currentWeekMonday)}`;
+          }
+          return 'Barcha amallar hisoboti';
+        };
+
         return (
           <div className="space-y-6 pt-2 pb-24 px-1 animate-in fade-in-50 duration-300">
+            {/* System Announcement Banner */}
+            {announcement && (
+              <div className="bg-gradient-to-r from-emerald-500/15 via-teal-500/10 to-blue-500/5 dark:from-emerald-500/10 dark:via-teal-500/5 dark:to-transparent border-l-4 border-emerald-500 dark:border-emerald-400 p-4 rounded-r-2xl shadow-sm relative overflow-hidden group animate-in slide-in-from-top-4 duration-300">
+                <div className="absolute right-2 top-2">
+                  <button 
+                    onClick={() => {
+                      if (announcement) {
+                        localStorage.setItem('admin_announcement_dismissed_title', announcement.title);
+                      }
+                      setAnnouncement(null);
+                    }}
+                    className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors p-1 rounded-full hover:bg-gray-150/40 dark:hover:bg-white/5 cursor-pointer"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                <div className="flex gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500/10 dark:bg-emerald-400/10 flex items-center justify-center shrink-0 text-emerald-600 dark:text-emerald-400">
+                    <Radio size={16} className="animate-pulse" />
+                  </div>
+                  <div className="pr-6 space-y-1">
+                    <h4 className="text-xs font-black text-gray-900 dark:text-white uppercase tracking-wider">
+                      {announcement.title}
+                    </h4>
+                    <p className="text-[11px] text-gray-500 dark:text-gray-400 font-semibold leading-relaxed">
+                      {announcement.msg}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Balance Card */}
             <BalanceCard 
               balance={currentBalance} 
               currency={profile.currency} 
               percentageChange={percentageChange} 
             />
+            
+            {/* Period Selector Tabs */}
+            <div className="space-y-2">
+              <div className="flex bg-gray-100 dark:bg-white/5 p-1 rounded-2xl border border-gray-200/40 dark:border-white/5 shadow-inner">
+                <button
+                  type="button"
+                  onClick={() => setDashboardPeriod('bugun')}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center justify-center gap-1.5 ${
+                    dashboardPeriod === 'bugun'
+                      ? 'bg-white dark:bg-white/10 text-primary dark:text-white shadow-sm font-extrabold scale-[1.02]'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white'
+                  }`}
+                >
+                  <CalendarDays size={14} className={dashboardPeriod === 'bugun' ? 'text-primary dark:text-white' : 'text-gray-400 dark:text-gray-500'} />
+                  <span>Kun</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDashboardPeriod('hafta')}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center justify-center gap-1.5 ${
+                    dashboardPeriod === 'hafta'
+                      ? 'bg-white dark:bg-white/10 text-primary dark:text-white shadow-sm font-extrabold scale-[1.02]'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white'
+                  }`}
+                >
+                  <Calendar size={14} className={dashboardPeriod === 'hafta' ? 'text-primary dark:text-white' : 'text-gray-400 dark:text-gray-500'} />
+                  <span>Hafta</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDashboardPeriod('barchasi')}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center justify-center gap-1.5 ${
+                    dashboardPeriod === 'barchasi'
+                      ? 'bg-white dark:bg-white/10 text-primary dark:text-white shadow-sm font-extrabold scale-[1.02]'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white'
+                  }`}
+                >
+                  <Layers size={14} className={dashboardPeriod === 'barchasi' ? 'text-primary dark:text-white' : 'text-gray-400 dark:text-gray-500'} />
+                  <span>Barchasi</span>
+                </button>
+              </div>
+              <div className="flex items-center justify-between px-1">
+                <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-white/5 px-2.5 py-1 rounded-lg">
+                  {getPeriodLabel()}
+                </span>
+                {dashboardPeriod !== 'barchasi' && (
+                  <span className="text-[9px] font-extrabold uppercase tracking-widest text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-md animate-pulse">
+                    Auto-Reset Active
+                  </span>
+                )}
+              </div>
+            </div>
             
             {/* Income vs Expense Summaries */}
             <IncomeExpenseSummary 
@@ -190,7 +509,7 @@ export default function App() {
 
             {/* Expenses breakdown */}
             <ExpenseBreakdown 
-              transactions={transactions} 
+              transactions={filteredTxsForPeriod} 
               onViewAll={() => setActiveTab('insights')} 
               currency={profile.currency}
             />
@@ -280,6 +599,8 @@ export default function App() {
         onToggleTheme={toggleTheme} 
         avatarUrl={profile.avatarUrl} 
         userName={profile.name}
+        userEmail={profile.email}
+        onAdminClick={() => setIsAdminOpen(true)}
       />
 
       {/* Main Container */}
@@ -386,6 +707,15 @@ export default function App() {
         editingTransaction={editingTransaction}
         currency={profile.currency}
       />
+
+      {/* Admin Panel Modal Overlay */}
+      {isAdminOpen && (
+        <AdminPanel 
+          onClose={() => setIsAdminOpen(false)}
+          onAddSampleTransactions={handleAddSampleTransactions}
+          onShowWebToast={showWebToast}
+        />
+      )}
 
     </div>
   );
