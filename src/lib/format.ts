@@ -16,7 +16,7 @@ export const formatAmount = (amount: number, currency: string): string => {
       maximumFractionDigits: 0
     }).format(amount).replace(/,/g, '.');
 
-    return `${withDots} UZS`;
+    return `${withDots}\u00A0UZS`;
   }
   
   // Normal currency format for others
@@ -25,7 +25,7 @@ export const formatAmount = (amount: number, currency: string): string => {
     maximumFractionDigits: 2
   }).format(amount);
   
-  return `${currency}${formatted}`;
+  return `${currency}\u00A0${formatted}`;
 };
 
 /**
@@ -38,7 +38,7 @@ export const formatSignedAmount = (amount: number, type: 'kirim' | 'chiqim', cur
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
     }).format(amount).replace(/,/g, '.');
-    return `${sign}${withDots} UZS`;
+    return `${sign}${withDots}\u00A0UZS`;
   }
   
   const formatted = new Intl.NumberFormat('en-US', {
@@ -46,5 +46,5 @@ export const formatSignedAmount = (amount: number, type: 'kirim' | 'chiqim', cur
     maximumFractionDigits: 2
   }).format(amount);
   
-  return `${sign}${currency}${formatted}`;
+  return `${sign}${currency}\u00A0${formatted}`;
 };

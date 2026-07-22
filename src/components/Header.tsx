@@ -39,14 +39,13 @@ export const Header: React.FC<HeaderProps> = ({
           {isAdmin && (
             <button
               onClick={onAdminClick}
-              className="px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest text-teal-600 bg-teal-500/10 dark:text-teal-400 dark:bg-teal-400/10 rounded-full border border-teal-500/20 dark:border-teal-400/20 cursor-pointer hover:scale-105 active:scale-95 transition-all flex items-center gap-1.5 shrink-0"
-              title="SmartBudget Bulutli Tizim Sozlamalari"
+              className="p-1.5 text-teal-600 bg-teal-500/10 dark:text-teal-400 dark:bg-teal-400/10 rounded-full border border-teal-500/20 dark:border-teal-400/20 cursor-pointer hover:scale-110 active:scale-90 transition-all flex items-center justify-center shrink-0"
+              title="Bulutli Tizim Sozlamalari"
             >
-              <span className="relative flex h-1.5 w-1.5">
+              <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </span>
-              <span>Cloud Sync</span>
             </button>
           )}
         </div>

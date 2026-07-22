@@ -38,7 +38,7 @@ export const IncomeExpenseSummary: React.FC<IncomeExpenseSummaryProps> = ({
             <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
               Kirim
             </span>
-            <p className="text-lg sm:text-xl font-bold text-emerald-600 dark:text-emerald-400 tracking-tight font-tabular mt-0.5">
+            <p className="text-lg sm:text-xl font-bold text-emerald-600 dark:text-emerald-400 tracking-tight font-tabular mt-0.5 whitespace-nowrap shrink-0">
               {formatAmount(income, currency)}
             </p>
           </div>
@@ -67,7 +67,7 @@ export const IncomeExpenseSummary: React.FC<IncomeExpenseSummaryProps> = ({
             <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
               Chiqim
             </span>
-            <p className="text-lg sm:text-xl font-bold text-rose-600 dark:text-rose-400 tracking-tight font-tabular mt-0.5">
+            <p className="text-lg sm:text-xl font-bold text-rose-600 dark:text-rose-400 tracking-tight font-tabular mt-0.5 whitespace-nowrap shrink-0">
               {formatAmount(expense, currency)}
             </p>
           </div>

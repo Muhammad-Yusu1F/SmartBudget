@@ -482,40 +482,21 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            {/* Currency */}
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-                Valyuta belgisi
-              </label>
-              <div className="relative">
-                <DollarSign size={14} className="absolute left-3.5 top-3 text-gray-400 dark:text-gray-500" />
-                <input
-                  type="text"
-                  maxLength={5}
-                  value={currency}
-                  onChange={(e) => setCurrency(e.target.value)}
-                  placeholder="$, UZS, €, vb."
-                  className="w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-primary font-tabular"
-                />
-              </div>
-            </div>
-
-            {/* Base balance */}
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-                Boshlang'ich Balans
-              </label>
-              <div className="relative">
-                <Wallet size={14} className="absolute left-3.5 top-3 text-gray-400 dark:text-gray-500" />
-                <input
-                  type="number"
-                  step="any"
-                  value={balanceInput}
-                  onChange={(e) => setBalanceInput(e.target.value)}
-                  className="w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-primary font-tabular"
-                />
-              </div>
+          {/* Currency */}
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
+              Valyuta belgisi
+            </label>
+            <div className="relative">
+              <DollarSign size={14} className="absolute left-3.5 top-3 text-gray-400 dark:text-gray-500" />
+              <input
+                type="text"
+                maxLength={5}
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                placeholder="$, UZS, €, vb."
+                className="w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-primary font-tabular"
+              />
             </div>
           </div>
 

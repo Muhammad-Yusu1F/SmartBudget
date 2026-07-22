@@ -227,6 +227,10 @@ export default function App() {
     .filter((t) => t.type === 'chiqim')
     .reduce((sum, t) => sum + t.amount, 0);
 
+  const currentPeriodBalance = dashboardPeriod === 'barchasi' 
+    ? currentBalance 
+    : (totalIncome - totalExpense);
+
   // Let's compute a dynamic comparison metric
   const percentageChange = filteredTxsForPeriod.length === 0 ? 0 : 12.5;
 
@@ -442,9 +446,10 @@ export default function App() {
 
             {/* Balance Card */}
             <BalanceCard 
-              balance={currentBalance} 
+              balance={currentPeriodBalance} 
               currency={profile.currency} 
-              percentageChange={percentageChange} 
+              percentageChange={percentageChange}
+              periodLabel={dashboardPeriod === 'bugun' ? '24 Soat / Bugun' : dashboardPeriod === 'hafta' ? 'Shu Hafta' : 'Umumiy'}
             />
             
             {/* Period Selector Tabs */}

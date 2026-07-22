@@ -113,8 +113,8 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-2">
-                    <p className={`font-bold text-sm tracking-tight font-tabular ${
+                  <div className="flex items-center gap-2 shrink-0 ml-2">
+                    <p className={`font-bold text-sm tracking-tight font-tabular whitespace-nowrap shrink-0 ${
                       isExpense 
                         ? 'text-rose-600 dark:text-rose-400' 
                         : 'text-emerald-600 dark:text-emerald-400'

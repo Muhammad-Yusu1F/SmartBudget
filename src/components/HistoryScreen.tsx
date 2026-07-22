@@ -341,23 +341,23 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 shrink-0 ml-2">
                       {/* Condensed Daily summary pills */}
-                      <div className="flex flex-col items-end gap-1 font-tabular">
-                        <div className="flex items-center gap-1.5 text-xs font-extrabold">
-                          <span className={isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}>
+                      <div className="flex flex-col items-end gap-1 font-tabular shrink-0">
+                        <div className="flex items-center gap-1.5 text-xs font-extrabold whitespace-nowrap shrink-0">
+                          <span className={`whitespace-nowrap ${isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                             {isPositive ? '+' : ''}{formatAmount(netBalance, currency)}
                           </span>
                         </div>
-                        <div className="flex gap-1.5 text-[9px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-wider">
-                          <span className="text-emerald-500">Kirim: {formatAmount(group.income, currency)}</span>
-                          <span>•</span>
-                          <span className="text-rose-500">Chiqim: {formatAmount(group.expense, currency)}</span>
+                        <div className="flex items-center gap-1.5 text-[9.5px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-wider whitespace-nowrap shrink-0">
+                          <span className="text-emerald-500 whitespace-nowrap">Kirim: {formatAmount(group.income, currency)}</span>
+                          <span className="text-gray-300 dark:text-gray-600">•</span>
+                          <span className="text-rose-500 whitespace-nowrap">Chiqim: {formatAmount(group.expense, currency)}</span>
                         </div>
                       </div>
                       
                       {/* Expansion Chevron */}
-                      <div className="text-gray-400 dark:text-gray-500 p-1">
+                      <div className="text-gray-400 dark:text-gray-500 p-1 shrink-0">
                         {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                       </div>
                     </div>
@@ -496,21 +496,21 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                      <div className="flex flex-col items-end gap-1 font-tabular">
-                        <div className="flex items-center gap-1.5 text-xs font-black">
-                          <span className={isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}>
+                    <div className="flex items-center gap-3 shrink-0 ml-2">
+                      <div className="flex flex-col items-end gap-1 font-tabular shrink-0">
+                        <div className="flex items-center gap-1.5 text-xs font-black whitespace-nowrap shrink-0">
+                          <span className={`whitespace-nowrap ${isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                             {isPositive ? '+' : ''}{formatAmount(netBalance, currency)}
                           </span>
                         </div>
-                        <div className="flex gap-1.5 text-[9px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-wider">
-                          <span className="text-emerald-500">Daromad: {formatAmount(week.income, currency)}</span>
-                          <span>•</span>
-                          <span className="text-rose-500">Xarajat: {formatAmount(week.expense, currency)}</span>
+                        <div className="flex items-center gap-1.5 text-[9.5px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-wider whitespace-nowrap shrink-0">
+                          <span className="text-emerald-500 whitespace-nowrap">Daromad: {formatAmount(week.income, currency)}</span>
+                          <span className="text-gray-300 dark:text-gray-600">•</span>
+                          <span className="text-rose-500 whitespace-nowrap">Xarajat: {formatAmount(week.expense, currency)}</span>
                         </div>
                       </div>
                       
-                      <div className="text-gray-400 dark:text-gray-500 p-1">
+                      <div className="text-gray-400 dark:text-gray-500 p-1 shrink-0">
                         {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                       </div>
                     </div>
