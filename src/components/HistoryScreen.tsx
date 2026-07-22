@@ -22,11 +22,12 @@ import {
   TrendingUp, 
   TrendingDown,
   ChevronRight,
-  Coins
+  Coins,
+  Lock
 } from 'lucide-react';
 import { Transaction, TransactionType } from '../types';
 import { CategoryIcon, getCategoryStyles } from './CategoryIcon';
-import { formatAmount, formatSignedAmount } from '../lib/format';
+import { formatAmount, formatSignedAmount, isTransactionLocked } from '../lib/format';
 
 interface HistoryScreenProps {
   transactions: Transaction[];
@@ -321,43 +322,45 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
                   {/* Day Header Bar */}
                   <div 
                     onClick={() => toggleDayExpand(group.date)}
-                    className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 select-none"
+                    className="p-3.5 sm:p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 select-none gap-2"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${
+                    <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                      <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${
                         isPositive 
                           ? 'bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' 
                           : 'bg-rose-500/10 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400'
                       }`}>
                         <CalendarDays size={18} />
                       </div>
-                      <div>
-                        <h3 className="font-extrabold text-sm text-gray-900 dark:text-white">
+                      <div className="min-w-0">
+                        <h3 className="font-extrabold text-xs sm:text-sm text-gray-900 dark:text-white truncate">
                           {formatDateUzbek(group.date)}
                         </h3>
-                        <p className="text-[10px] text-gray-400 dark:text-gray-500 font-semibold uppercase tracking-wider">
+                        <p className="text-[10px] text-gray-400 dark:text-gray-500 font-semibold uppercase tracking-wider truncate">
                           {group.transactions.length} ta operatsiya
                         </p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3 shrink-0 ml-2">
-                      {/* Condensed Daily summary pills */}
-                      <div className="flex flex-col items-end gap-1 font-tabular shrink-0">
-                        <div className="flex items-center gap-1.5 text-xs font-extrabold whitespace-nowrap shrink-0">
-                          <span className={`whitespace-nowrap ${isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-                            {isPositive ? '+' : ''}{formatAmount(netBalance, currency)}
+                    <div className="flex items-center gap-2 shrink-0 ml-auto">
+                      {/* Compact Green (Income) & Red (Expense) numbers without text labels */}
+                      <div className="flex flex-col items-end text-right font-tabular shrink-0">
+                        <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                          +{formatAmount(group.income, currency)}
+                        </span>
+                        {group.expense > 0 ? (
+                          <span className="text-[10.5px] font-bold text-rose-600 dark:text-rose-400 whitespace-nowrap">
+                            -{formatAmount(group.expense, currency)}
                           </span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-[9.5px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-wider whitespace-nowrap shrink-0">
-                          <span className="text-emerald-500 whitespace-nowrap">Kirim: {formatAmount(group.income, currency)}</span>
-                          <span className="text-gray-300 dark:text-gray-600">•</span>
-                          <span className="text-rose-500 whitespace-nowrap">Chiqim: {formatAmount(group.expense, currency)}</span>
-                        </div>
+                        ) : (
+                          <span className="text-[10.5px] font-bold text-gray-400 dark:text-gray-500 whitespace-nowrap">
+                            -0 UZS
+                          </span>
+                        )}
                       </div>
                       
                       {/* Expansion Chevron */}
-                      <div className="text-gray-400 dark:text-gray-500 p-1 shrink-0">
+                      <div className="text-gray-400 dark:text-gray-500 p-0.5 shrink-0">
                         {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                       </div>
                     </div>
@@ -398,11 +401,17 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
                                       </span>
                                     )}
                                   </div>
-                                  <div className="flex items-center gap-1.5 mt-0.5">
+                                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                                     <span className="text-[10px] text-gray-400 dark:text-gray-500 font-bold flex items-center gap-0.5">
                                       <Clock size={9} />
                                       {tx.time}
                                     </span>
+                                    {isTransactionLocked(tx) && (
+                                      <span className="inline-flex items-center gap-0.5 text-[8.5px] font-extrabold text-amber-700 dark:text-amber-400 bg-amber-100/70 dark:bg-amber-950/40 px-1.5 py-0.5 rounded-md">
+                                        <Lock size={8} />
+                                        <span>24s muhrlangan</span>
+                                      </span>
+                                    )}
                                     {tx.description && (
                                       <>
                                         <span className="w-1 h-1 bg-gray-200 dark:bg-gray-800 rounded-full"></span>
@@ -427,7 +436,7 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
 
                             {/* Optional items list */}
                             {hasItems && isItemExpanded && (
-                              <div className="mt-2.5 ml-12 p-2.5 bg-white dark:bg-[#131b2e]/60 rounded-xl border border-gray-150/40 dark:border-white/5 space-y-1.5">
+                              <div className="mt-2.5 ml-12 p-2.5 bg-white dark:bg-[#131b2e]/60 rounded-xl border border-gray-200 dark:border-white/5 space-y-1.5 shadow-xs">
                                 <span className="block text-[8px] font-extrabold uppercase text-gray-400 dark:text-gray-500 tracking-wider">
                                   Xarid qilingan ro'yxat:
                                 </span>
@@ -476,41 +485,44 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
                   {/* Week Header Bar */}
                   <div 
                     onClick={() => toggleWeekExpand(week.mondayDate)}
-                    className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 select-none"
+                    className="p-3.5 sm:p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 select-none gap-2"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${
+                    <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                      <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${
                         isPositive 
                           ? 'bg-gradient-to-tr from-emerald-500 to-teal-500 text-white' 
                           : 'bg-gradient-to-tr from-rose-500 to-pink-500 text-white'
                       }`}>
                         <Calendar size={18} />
                       </div>
-                      <div>
-                        <h3 className="font-extrabold text-sm text-gray-900 dark:text-white">
+                      <div className="min-w-0">
+                        <h3 className="font-extrabold text-xs sm:text-sm text-gray-900 dark:text-white truncate">
                           {week.label}
                         </h3>
-                        <p className="text-[10px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-wider">
+                        <p className="text-[10px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-wider truncate">
                           Ushbu haftada {week.transactions.length} ta operatsiya
                         </p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3 shrink-0 ml-2">
-                      <div className="flex flex-col items-end gap-1 font-tabular shrink-0">
-                        <div className="flex items-center gap-1.5 text-xs font-black whitespace-nowrap shrink-0">
-                          <span className={`whitespace-nowrap ${isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-                            {isPositive ? '+' : ''}{formatAmount(netBalance, currency)}
+                    <div className="flex items-center gap-2 shrink-0 ml-auto">
+                      {/* Compact Green (Income) & Red (Expense) numbers without text labels */}
+                      <div className="flex flex-col items-end text-right font-tabular shrink-0">
+                        <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                          +{formatAmount(week.income, currency)}
+                        </span>
+                        {week.expense > 0 ? (
+                          <span className="text-[10.5px] font-bold text-rose-600 dark:text-rose-400 whitespace-nowrap">
+                            -{formatAmount(week.expense, currency)}
                           </span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-[9.5px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-wider whitespace-nowrap shrink-0">
-                          <span className="text-emerald-500 whitespace-nowrap">Daromad: {formatAmount(week.income, currency)}</span>
-                          <span className="text-gray-300 dark:text-gray-600">•</span>
-                          <span className="text-rose-500 whitespace-nowrap">Xarajat: {formatAmount(week.expense, currency)}</span>
-                        </div>
+                        ) : (
+                          <span className="text-[10.5px] font-bold text-gray-400 dark:text-gray-500 whitespace-nowrap">
+                            -0 UZS
+                          </span>
+                        )}
                       </div>
                       
-                      <div className="text-gray-400 dark:text-gray-500 p-1 shrink-0">
+                      <div className="text-gray-400 dark:text-gray-500 p-0.5 shrink-0">
                         {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                       </div>
                     </div>
@@ -518,7 +530,7 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
 
                   {/* Nested days or transactions inside that week */}
                   {isOpen && (
-                    <div className="border-t border-gray-50 dark:border-white/5 bg-gray-50/40 dark:bg-[#131b2e]/30 px-4 pb-4 pt-2 divide-y divide-gray-150/50 dark:divide-white/5">
+                    <div className="border-t border-gray-100 dark:border-white/5 bg-gray-50/40 dark:bg-[#131b2e]/30 px-4 pb-4 pt-2 divide-y divide-gray-100 dark:divide-white/5">
                       {week.transactions.map(tx => {
                         const isExp = tx.type === 'chiqim';
                         const styles = getCategoryStyles(tx.category);
@@ -544,6 +556,11 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
                                   <span className="text-[9.5px] text-gray-400 dark:text-gray-500 font-medium">
                                     {tx.time}
                                   </span>
+                                  {isTransactionLocked(tx) && (
+                                    <span className="inline-flex items-center gap-0.5 text-[8.5px] font-extrabold text-amber-700 dark:text-amber-400 bg-amber-100/70 dark:bg-amber-950/40 px-1 py-0.2 rounded">
+                                      <Lock size={8} />
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                             </div>

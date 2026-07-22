@@ -252,7 +252,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
           {/* 1. Statistics Cards */}
           <div className="grid grid-cols-2 gap-3">
-            <div className="bg-white dark:bg-[#131b2e] p-4 rounded-2xl border border-gray-150/50 dark:border-white/5 shadow-sm text-center relative overflow-hidden group">
+            <div className="bg-white dark:bg-[#131b2e] p-4 rounded-2xl border border-gray-200 dark:border-white/5 shadow-sm text-center relative overflow-hidden group">
               <div className="absolute top-2 right-2 text-[#2116d0]/10 dark:text-[#2116d0]/5 group-hover:scale-110 duration-200">
                 <Download size={48} />
               </div>
@@ -267,7 +267,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </p>
             </div>
 
-            <div className="bg-white dark:bg-[#131b2e] p-4 rounded-2xl border border-gray-150/50 dark:border-white/5 shadow-sm text-center relative overflow-hidden group">
+            <div className="bg-white dark:bg-[#131b2e] p-4 rounded-2xl border border-gray-200 dark:border-white/5 shadow-sm text-center relative overflow-hidden group">
               <div className="absolute top-2 right-2 text-[#006c49]/10 dark:text-[#006c49]/5">
                 <Users size={48} />
               </div>
@@ -284,7 +284,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
 
           {/* 2. Simulation & Debug Actions */}
-          <div className="bg-white dark:bg-[#131b2e] p-4 rounded-2xl border border-gray-150/50 dark:border-white/5 shadow-sm space-y-3">
+          <div className="bg-white dark:bg-[#131b2e] p-4 rounded-2xl border border-gray-200 dark:border-white/5 shadow-sm space-y-3">
             <h4 className="text-xs font-black uppercase tracking-wider text-gray-400 dark:text-gray-500 flex items-center gap-1.5">
               <Sparkles size={13} className="text-emerald-500 animate-pulse" />
               Tizim Faolligini Tekshirish (Test Rejimi)
@@ -338,7 +338,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
 
           {/* 3. Download Trend Chart */}
-          <div className="bg-white dark:bg-[#131b2e] p-4 rounded-2xl border border-gray-150/50 dark:border-white/5 shadow-sm space-y-3">
+          <div className="bg-white dark:bg-[#131b2e] p-4 rounded-2xl border border-gray-200 dark:border-white/5 shadow-sm space-y-3">
             <p className="text-xs font-black uppercase tracking-wider text-gray-400 dark:text-gray-500 flex items-center gap-1.5">
               <Calendar size={13} className="text-[#2116d0] dark:text-[#6ffbbe]" />
               Kunlik Faollik Grafigi
@@ -368,7 +368,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
 
           {/* 4. Tizim E'lonlari Manager */}
-          <div className="bg-white dark:bg-[#131b2e] p-4 rounded-2xl border border-gray-150/50 dark:border-white/5 shadow-sm space-y-3.5">
+          <div className="bg-white dark:bg-[#131b2e] p-4 rounded-2xl border border-gray-200 dark:border-white/5 shadow-sm space-y-3.5">
             <h4 className="text-xs font-black uppercase tracking-wider text-gray-400 dark:text-gray-500 flex items-center gap-1.5">
               <Radio size={13} className="text-emerald-500 animate-pulse" />
               Tizim Eʻlonlari va Bildirishnomalar
@@ -441,7 +441,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <span className="text-xs">Yuklanmoqda...</span>
               </div>
             ) : downloads.length === 0 ? (
-              <div className="p-6 bg-white dark:bg-[#131b2e] border border-gray-150/40 dark:border-white/5 rounded-2xl text-center text-xs text-gray-400">
+              <div className="p-6 bg-white dark:bg-[#131b2e] border border-gray-200 dark:border-white/5 rounded-2xl text-center text-xs text-gray-400">
                 Hali hech kim ilovani oʻrnatmadi yoki ochmadi. Ilovani boshqa qurilmalarda ochsangiz real ismlar bu yerda koʻrinadi!
               </div>
             ) : (
@@ -453,7 +453,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   return (
                     <div 
                       key={item.id} 
-                      className="flex justify-between items-center p-2.5 bg-white dark:bg-[#131b2e] border border-gray-150/40 dark:border-white/5 rounded-xl text-xs hover:border-indigo-500/20 transition-all shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-200"
+                      className="flex justify-between items-center p-2.5 bg-white dark:bg-[#131b2e] border border-gray-200 dark:border-white/5 rounded-xl text-xs hover:border-indigo-500/20 transition-all shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-200"
                     >
                       <div className="flex items-center gap-2">
                         <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${

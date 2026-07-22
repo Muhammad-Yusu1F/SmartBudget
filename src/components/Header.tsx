@@ -13,6 +13,7 @@ interface HeaderProps {
   userName: string;
   userEmail?: string;
   onAdminClick?: () => void;
+  onLogoClick?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({ 
@@ -21,14 +22,19 @@ export const Header: React.FC<HeaderProps> = ({
   avatarUrl, 
   userName,
   userEmail,
-  onAdminClick
+  onAdminClick,
+  onLogoClick
 }) => {
   const isAdmin = userEmail?.toLowerCase() === 'muhayusuf105@gmail.com';
 
   return (
     <header className="fixed top-0 left-0 right-0 w-full z-50 bg-[#faf8ff] dark:bg-[#131b2e]/95 backdrop-blur-md shadow-sm border-b border-gray-100 dark:border-white/10 flex justify-between items-center px-5 h-16 transition-colors duration-200">
       {/* Left side: SmartBudget Logo and Name */}
-      <div className="flex items-center gap-2.5">
+      <div 
+        onClick={onLogoClick}
+        className="flex items-center gap-2.5 cursor-pointer hover:opacity-90 active:scale-95 transition-all select-none"
+        title="SmartBudget Bosh Sahifasi"
+      >
         <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#38bdf8] to-[#0284c7] dark:from-[#0ea5e9] dark:to-[#0369a1] flex items-center justify-center shadow-md shadow-sky-500/15 dark:shadow-sky-500/5 shrink-0">
           <Wallet size={18} className="text-white" />
         </div>

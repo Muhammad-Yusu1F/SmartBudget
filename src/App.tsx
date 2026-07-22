@@ -26,9 +26,13 @@ import { InsightsScreen } from './components/InsightsScreen';
 import { ProfileScreen } from './components/ProfileScreen';
 import { AboutScreen } from './components/AboutScreen';
 import { AdminPanel } from './components/AdminPanel';
+import { SplashScreen } from './components/SplashScreen';
 import { Plus, Home, ReceiptText, BarChart3, User, Grid2X2, Info, CalendarDays, Calendar, Layers, X, Radio } from 'lucide-react';
 
 export default function App() {
+  // Splash Screen State
+  const [showSplash, setShowSplash] = useState(true);
+
   // Global States
   const [theme, setTheme] = useState<'light' | 'dark'>(getTheme());
   const [profile, setProfile] = useState<UserProfile>(getProfile());
@@ -423,7 +427,7 @@ export default function App() {
                       }
                       setAnnouncement(null);
                     }}
-                    className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors p-1 rounded-full hover:bg-gray-150/40 dark:hover:bg-white/5 cursor-pointer"
+                    className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors p-1 rounded-full hover:bg-gray-200 dark:hover:bg-white/5 cursor-pointer"
                   >
                     <X size={14} />
                   </button>
@@ -568,6 +572,13 @@ export default function App() {
   return (
     <div className="bg-[#faf8ff] dark:bg-[#131b2e] text-[#131b2e] dark:text-[#faf8ff] min-h-screen pb-24 transition-colors duration-200">
       
+      {/* Animated App Entrance Splash Screen */}
+      <SplashScreen 
+        isVisible={showSplash} 
+        userName={profile.name} 
+        onFinish={() => setShowSplash(false)} 
+      />
+
       {/* Dynamic SMS Notification Banner Simulation */}
       {webToastMessage && (
         <div className="fixed top-4 left-4 right-4 z-[9999] max-w-sm mx-auto bg-gray-900/95 dark:bg-[#1e293b]/95 backdrop-blur-md rounded-2xl p-4 shadow-2xl border border-white/10 text-white animate-in slide-in-from-top-12 duration-300">
@@ -606,6 +617,7 @@ export default function App() {
         userName={profile.name}
         userEmail={profile.email}
         onAdminClick={() => setIsAdminOpen(true)}
+        onLogoClick={() => setShowSplash(true)}
       />
 
       {/* Main Container */}

@@ -185,7 +185,7 @@ export const AboutScreen: React.FC = () => {
           </div>
         </div>
 
-        <div className="border-t border-gray-150 dark:border-white/5 pt-3.5 flex flex-col items-center justify-center space-y-2 relative z-10">
+        <div className="border-t border-gray-100 dark:border-white/5 pt-3.5 flex flex-col items-center justify-center space-y-2 relative z-10">
           <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider flex items-center gap-1">
             <Send size={10} className="text-sky-500" /> Bog'lanish uchun
           </span>

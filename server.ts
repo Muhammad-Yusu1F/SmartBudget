@@ -12,7 +12,66 @@ import fs from 'fs';
 dotenv.config();
 
 const app = express();
-app.use(express.json());
+
+// Security Hardening Config
+app.disable('x-powered-by');
+app.use(express.json({ limit: '50kb' })); // Mitigate Large Payload DoS Attacks
+
+// Security Headers Middleware (OWASP Standard Protection)
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https: blob:; connect-src 'self' http://ip-api.com https:;"
+  );
+  next();
+});
+
+// Anti-Spam / Anti-DDoS Rate Limiter Middleware
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
+const MAX_REQUESTS_PER_MIN = 120; // 120 requests/min per IP
+
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/')) {
+    const ip = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || 'unknown';
+    const cleanIp = ip.split(',')[0].trim();
+    const now = Date.now();
+    const rateData = rateLimitMap.get(cleanIp) || { count: 0, resetTime: now + RATE_LIMIT_WINDOW };
+
+    if (now > rateData.resetTime) {
+      rateData.count = 1;
+      rateData.resetTime = now + RATE_LIMIT_WINDOW;
+    } else {
+      rateData.count += 1;
+    }
+
+    rateLimitMap.set(cleanIp, rateData);
+
+    if (rateData.count > MAX_REQUESTS_PER_MIN) {
+      return res.status(429).json({ error: 'Juda ko\'p so\'rovlar yuborildi. Iltimos 1 daqiqa kuting.' });
+    }
+  }
+  next();
+});
+
+// Helper for XSS and HTML injection prevention
+function sanitizeInput(val: any): string {
+  if (typeof val !== 'string') return '';
+  return val
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\//g, '&#x2F;')
+    .trim()
+    .substring(0, 100); // Enforce max length safety constraint
+}
 
 const PORT = 3000;
 
@@ -113,19 +172,24 @@ app.get('/api/admin/downloads', (req, res) => {
 // 2. Track/register real download (from a client)
 app.post('/api/track-download', async (req, res) => {
   const { deviceId, name, email, device } = req.body;
-  if (!deviceId) {
+  if (!deviceId || typeof deviceId !== 'string') {
     return res.status(400).json({ error: 'deviceId is required' });
   }
 
+  const cleanDeviceId = sanitizeInput(deviceId);
+  const cleanName = name ? sanitizeInput(name) : 'Foydalanuvchi';
+  const cleanEmail = email ? sanitizeInput(email) : '';
+  const cleanDevice = device ? sanitizeInput(device) : 'Web';
+
   const downloads = getDownloads();
-  const existingIndex = downloads.findIndex(d => d.deviceId === deviceId);
+  const existingIndex = downloads.findIndex(d => d.deviceId === cleanDeviceId);
   const ipAddress = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '';
 
   if (existingIndex > -1) {
     // Already tracked. Update client info if they edited their profile (name, email, device)
-    downloads[existingIndex].name = name || downloads[existingIndex].name || 'Foydalanuvchi';
-    downloads[existingIndex].email = email || downloads[existingIndex].email || '';
-    downloads[existingIndex].device = device || downloads[existingIndex].device || 'Web';
+    downloads[existingIndex].name = cleanName || downloads[existingIndex].name || 'Foydalanuvchi';
+    downloads[existingIndex].email = cleanEmail || downloads[existingIndex].email || '';
+    downloads[existingIndex].device = cleanDevice || downloads[existingIndex].device || 'Web';
     saveDownloads(downloads);
     return res.json({ status: 'updated', event: downloads[existingIndex] });
   } else {
@@ -137,13 +201,13 @@ app.post('/api/track-download', async (req, res) => {
 
     const newEvent: DownloadEvent = {
       id: Date.now().toString() + Math.random().toString(36).substring(2, 5),
-      deviceId,
+      deviceId: cleanDeviceId,
       date: dateStr,
       time: timeStr,
-      name: name || 'Yangi Foydalanuvchi',
-      email: email || '',
-      device: device || 'Web',
-      city: city
+      name: cleanName || 'Yangi Foydalanuvchi',
+      email: cleanEmail || '',
+      device: cleanDevice || 'Web',
+      city: sanitizeInput(city)
     };
 
     downloads.unshift(newEvent);

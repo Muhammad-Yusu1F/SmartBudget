@@ -4,9 +4,9 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { X, Trash2, Plus, Edit3, ShoppingBag, PlusCircle, Search } from 'lucide-react';
+import { X, Trash2, Plus, Edit3, ShoppingBag, PlusCircle, Search, Lock } from 'lucide-react';
 import { Transaction, TransactionType } from '../types';
-import { formatAmount } from '../lib/format';
+import { formatAmount, isTransactionLocked } from '../lib/format';
 import { CategoryIcon, getCategoryStyles } from './CategoryIcon';
 
 interface TransactionModalProps {
@@ -176,8 +176,11 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     setAmount(sum > 0 ? formatInput(currency === 'UZS' ? Math.round(sum).toString() : sum.toFixed(2)) : '');
   };
 
+  const isLocked = isTransactionLocked(editingTransaction);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLocked) return;
     setError('');
 
     if (!title.trim()) {
@@ -253,6 +256,21 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         {/* Scrollable Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1 scrollbar-thin">
           
+          {/* 24-Hour Locked Notice Banner */}
+          {isLocked && (
+            <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 p-3.5 rounded-xl flex items-start gap-3 text-amber-900 dark:text-amber-200 text-xs shadow-sm">
+              <Lock size={18} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-black text-amber-950 dark:text-amber-100 flex items-center gap-1">
+                  <span>🔒 24 Soat O'tdi — Tarixda Muhrlangan</span>
+                </p>
+                <p className="text-[11px] font-medium text-amber-800 dark:text-amber-300/90 mt-0.5 leading-relaxed">
+                  Operatsiya yozilganidan so'ng 24 soat to'lgani sababli, uning summasi va nomi doimiy ravishda bloklangan. Moliyaviy halollik va xavfsizlik uchun uni o'zgartirib yoki o'chirib bo'lmaydi.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Error Message */}
           {error && (
             <div className="bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 p-3 rounded-xl text-xs font-semibold border border-rose-100 dark:border-rose-950">
@@ -264,8 +282,9 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 dark:bg-white/5 rounded-xl border border-gray-200/50 dark:border-white/5">
             <button
               type="button"
+              disabled={isLocked}
               onClick={() => handleTypeChange('chiqim')}
-              className={`py-2 px-4 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              className={`py-2 px-4 rounded-lg text-xs font-bold transition-all ${isLocked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'} ${
                 type === 'chiqim'
                   ? 'bg-rose-600 text-white shadow-md'
                   : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white'
@@ -275,8 +294,9 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             </button>
             <button
               type="button"
+              disabled={isLocked}
               onClick={() => handleTypeChange('kirim')}
-              className={`py-2 px-4 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              className={`py-2 px-4 rounded-lg text-xs font-bold transition-all ${isLocked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'} ${
                 type === 'kirim'
                   ? 'bg-emerald-600 text-white shadow-md'
                   : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white'
@@ -293,14 +313,17 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             </label>
             <input
               type="text"
+              disabled={isLocked}
               placeholder="Masalan: Yandex Go, Tushlik, Supermarket"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:border-primary dark:focus:border-primary-fixed-dim focus:ring-1 focus:ring-primary dark:focus:ring-primary-fixed-dim"
+              className={`w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:border-primary dark:focus:border-primary-fixed-dim focus:ring-1 focus:ring-primary dark:focus:ring-primary-fixed-dim ${
+                isLocked ? 'opacity-70 cursor-not-allowed bg-gray-100 dark:bg-white/10' : ''
+              }`}
             />
           </div>
 
-          {/* Amount (Disabled if showItemsEditor is on, to guide user to use item prices) */}
+          {/* Amount */}
           <div>
             <div className="flex justify-between items-center mb-1.5">
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
@@ -322,15 +345,16 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                 placeholder="0"
                 value={amount}
                 onChange={(e) => setAmount(formatInput(e.target.value))}
-                disabled={showItemsEditor}
+                disabled={showItemsEditor || isLocked}
                 className={`w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl pr-4 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:border-primary dark:focus:border-primary-fixed-dim focus:ring-1 focus:ring-primary dark:focus:ring-primary-fixed-dim font-tabular ${
                   currency.length > 1 ? 'pl-16' : 'pl-8'
                 } ${
-                  showItemsEditor ? 'opacity-70 cursor-not-allowed bg-gray-150 dark:bg-white/10' : ''
+                  showItemsEditor || isLocked ? 'opacity-70 cursor-not-allowed bg-gray-100 dark:bg-white/10' : ''
                 }`}
               />
             </div>
           </div>
+
 
           {/* PLUS FEATURE: Itemized Purchase List Toggle */}
           <div className="bg-primary/5 dark:bg-white/5 p-4 rounded-xl border border-primary/20 dark:border-white/10 space-y-3">
@@ -513,9 +537,12 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               </label>
               <input
                 type="date"
+                disabled={isLocked}
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-primary dark:focus:border-primary-fixed-dim focus:ring-1 focus:ring-primary dark:focus:ring-primary-fixed-dim cursor-pointer"
+                className={`w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-primary dark:focus:border-primary-fixed-dim focus:ring-1 focus:ring-primary dark:focus:ring-primary-fixed-dim ${
+                  isLocked ? 'opacity-70 cursor-not-allowed bg-gray-100 dark:bg-white/10' : 'cursor-pointer'
+                }`}
               />
             </div>
             <div>
@@ -524,9 +551,12 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               </label>
               <input
                 type="time"
+                disabled={isLocked}
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
-                className="w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-primary dark:focus:border-primary-fixed-dim focus:ring-1 focus:ring-primary dark:focus:ring-primary-fixed-dim cursor-pointer"
+                className={`w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-primary dark:focus:border-primary-fixed-dim focus:ring-1 focus:ring-primary dark:focus:ring-primary-fixed-dim ${
+                  isLocked ? 'opacity-70 cursor-not-allowed bg-gray-100 dark:bg-white/10' : 'cursor-pointer'
+                }`}
               />
             </div>
           </div>
@@ -538,15 +568,29 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             </label>
             <textarea
               placeholder="Xarid tafsilotlari..."
+              disabled={isLocked}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
-              className="w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:border-primary dark:focus:border-primary-fixed-dim focus:ring-1 focus:ring-primary dark:focus:ring-primary-fixed-dim resize-none"
+              className={`w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:border-primary dark:focus:border-primary-fixed-dim focus:ring-1 focus:ring-primary dark:focus:ring-primary-fixed-dim resize-none ${
+                isLocked ? 'opacity-70 cursor-not-allowed bg-gray-100 dark:bg-white/10' : ''
+              }`}
             />
           </div>
 
           {/* Action Buttons */}
-          {showDeleteConfirm ? (
+          {isLocked ? (
+            <div className="pt-3 border-t border-gray-100 dark:border-white/5 shrink-0">
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-300/40 dark:border-amber-800/50 py-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+              >
+                <Lock size={16} className="text-amber-600 dark:text-amber-400" />
+                <span>O'zgartirish Muhrlangan (24 Soat O'tgan) • Yopish</span>
+              </button>
+            </div>
+          ) : showDeleteConfirm ? (
             <div className="bg-rose-50 dark:bg-rose-950/20 p-4 rounded-xl border border-rose-100 dark:border-rose-950/40 space-y-3 animate-in fade-in duration-200 shrink-0">
               <p className="text-xs text-rose-600 dark:text-rose-400 font-bold text-center flex items-center justify-center gap-1.5">
                 <Trash2 size={14} className="animate-bounce" />
@@ -595,6 +639,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               </button>
             </div>
           )}
+
 
         </form>
       </div>

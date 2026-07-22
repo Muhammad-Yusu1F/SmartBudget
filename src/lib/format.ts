@@ -48,3 +48,21 @@ export const formatSignedAmount = (amount: number, type: 'kirim' | 'chiqim', cur
   
   return `${sign}${currency}\u00A0${formatted}`;
 };
+
+/**
+ * Checks if a transaction is older than 24 hours and therefore locked from edits.
+ */
+export const isTransactionLocked = (tx?: { date?: string; time?: string } | null): boolean => {
+  if (!tx || !tx.date) return false;
+  try {
+    const timeStr = tx.time || '00:00';
+    const txDateTime = new Date(`${tx.date}T${timeStr}:00`).getTime();
+    if (isNaN(txDateTime)) return false;
+    const now = Date.now();
+    const diffInMs = now - txDateTime;
+    const diffInHours = diffInMs / (1000 * 60 * 60);
+    return diffInHours >= 24;
+  } catch (e) {
+    return false;
+  }
+};

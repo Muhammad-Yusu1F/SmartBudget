@@ -39,10 +39,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({
                 {formatAmount(balance, currency)}
               </h2>
             </div>
-            
-            <div className="bg-white/15 backdrop-blur-md text-[10px] font-black uppercase px-2.5 py-1 rounded-full text-white/90 border border-white/20 whitespace-nowrap shrink-0">
-              24-soatlik sikl
-            </div>
           </div>
           
           <div className="flex items-center justify-between pt-2 border-t border-white/15">

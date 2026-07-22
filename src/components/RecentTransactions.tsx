@@ -6,8 +6,8 @@
 import React, { useState } from 'react';
 import { Transaction } from '../types';
 import { CategoryIcon, getCategoryStyles } from './CategoryIcon';
-import { ChevronDown, ChevronUp, ShoppingBag, PlusCircle } from 'lucide-react';
-import { formatAmount, formatSignedAmount } from '../lib/format';
+import { ChevronDown, ChevronUp, ShoppingBag, PlusCircle, Lock } from 'lucide-react';
+import { formatAmount, formatSignedAmount, isTransactionLocked } from '../lib/format';
 
 interface RecentTransactionsProps {
   transactions: Transaction[];
@@ -107,9 +107,17 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">
-                        {formatTxDate(tx.date, tx.time)}
-                      </p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">
+                          {formatTxDate(tx.date, tx.time)}
+                        </p>
+                        {isTransactionLocked(tx) && (
+                          <span className="inline-flex items-center gap-0.5 text-[8.5px] font-extrabold text-amber-700 dark:text-amber-400 bg-amber-100/70 dark:bg-amber-950/40 px-1.5 py-0.5 rounded" title="24 soat o'tgan - Muhrlangan">
+                            <Lock size={8} />
+                            <span>24s muhrlangan</span>
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                   
