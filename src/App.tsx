@@ -4,6 +4,8 @@
  */
 
 import { useState, useEffect } from 'react';
+import { onAuthStateChanged, signOut, User as FirebaseUser } from 'firebase/auth';
+import { auth } from './lib/firebase';
 import { 
   getTransactions, 
   saveTransactions, 
@@ -12,7 +14,10 @@ import {
   getBaseBalance, 
   saveBaseBalance, 
   getTheme, 
-  saveTheme 
+  saveTheme,
+  setStorageErrorCallback,
+  fetchUserDataFromFirestore,
+  migrateLocalDataToFirestore
 } from './lib/storage';
 import { Transaction, UserProfile } from './types';
 import { Header } from './components/Header';
@@ -26,18 +31,72 @@ import { InsightsScreen } from './components/InsightsScreen';
 import { ProfileScreen } from './components/ProfileScreen';
 import { AboutScreen } from './components/AboutScreen';
 import { AdminPanel } from './components/AdminPanel';
+import { AdminAuthModal } from './components/AdminAuthModal';
+import { AuthScreen } from './components/AuthScreen';
 import { SplashScreen } from './components/SplashScreen';
+import { triggerInstantNotification } from './lib/notifications';
 import { Plus, Home, ReceiptText, BarChart3, User, Grid2X2, Info, CalendarDays, Calendar, Layers, X, Radio } from 'lucide-react';
 
 export default function App() {
   // Splash Screen State
   const [showSplash, setShowSplash] = useState(true);
 
+  // Auth State
+  const [authUser, setAuthUser] = useState<FirebaseUser | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isGuestMode, setIsGuestMode] = useState(false);
+
   // Global States
   const [theme, setTheme] = useState<'light' | 'dark'>(getTheme());
   const [profile, setProfile] = useState<UserProfile>(getProfile());
   const [baseBalance, setBaseBalance] = useState<number>(getBaseBalance());
   const [transactions, setTransactions] = useState<Transaction[]>(getTransactions());
+
+  // Listen to Firebase Auth state changes & sync Firestore
+  useEffect(() => {
+    setStorageErrorCallback((msg) => {
+      setWebToastMessage(msg);
+    });
+
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setAuthUser(user);
+      if (user) {
+        // Automatic migration of pre-existing local data to Firestore if user doc is missing
+        await migrateLocalDataToFirestore(user.uid, user.email || '');
+
+        // Fetch user data from Firestore & update state/localStorage
+        const cloudData = await fetchUserDataFromFirestore(user.uid);
+        if (cloudData.transactions !== null) {
+          setTransactions(cloudData.transactions);
+        }
+        if (cloudData.profile !== null) {
+          setProfile(cloudData.profile);
+        } else if (user.email) {
+          const currentProf = getProfile();
+          const updated = { ...currentProf, email: user.email, name: user.displayName || currentProf.name };
+          setProfile(updated);
+          saveProfile(updated, user.uid);
+        }
+        if (cloudData.baseBalance !== null) {
+          setBaseBalance(cloudData.baseBalance);
+        }
+      }
+      setIsAuthLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      setIsGuestMode(false);
+      setWebToastMessage("Tizimdan muvaffaqiyatli chiqdingiz.");
+    } catch (err) {
+      console.error("Logout error:", err);
+      setIsGuestMode(false);
+    }
+  };
   
   // Navigation State
   const [activeTab, setActiveTab] = useState<'home' | 'history' | 'insights' | 'profile' | 'about'>('home');
@@ -70,7 +129,7 @@ export default function App() {
         }
       }
     } catch (err) {
-      console.error('Error loading announcement:', err);
+      // Silently catch network drops on initial load
     }
   };
 
@@ -109,17 +168,28 @@ export default function App() {
           })
         });
       } catch (err) {
-        console.error('Error tracking download:', err);
+        // Silently handle tracking error on offline state
       }
     };
 
     trackUserDownload();
   }, [profile.name, profile.email]);
   
-  // Modal states
+  // Modal & Admin Auth states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [webToastMessage, setWebToastMessage] = useState<string | null>(null);
+  const [adminKey, setAdminKey] = useState<string>('');
+  const [isAdminAuthModalOpen, setIsAdminAuthModalOpen] = useState(false);
+
+  // Trigger Admin Panel (requests password verification if not authenticated)
+  const handleOpenAdminPanel = () => {
+    if (adminKey) {
+      setIsAdminOpen(true);
+    } else {
+      setIsAdminAuthModalOpen(true);
+    }
+  };
 
   // Apply and persist dark mode
   useEffect(() => {
@@ -131,20 +201,6 @@ export default function App() {
     }
     saveTheme(theme);
   }, [theme]);
-
-  // Run a one-time force reset of all dynamic transaction data and balance to 0 for the user's fresh start
-  useEffect(() => {
-    const isReset = localStorage.getItem('moliya_force_reset_fresh_v5');
-    if (!isReset) {
-      localStorage.setItem('moliya_transactions', JSON.stringify([]));
-      localStorage.setItem('moliya_base_balance', '0');
-      localStorage.removeItem('moliya_profile'); // Clear any cached legacy profiles
-      localStorage.setItem('moliya_force_reset_fresh_v5', 'true');
-      setTransactions([]);
-      setBaseBalance(0);
-      setProfile(getProfile()); // Sets profile back to initial clean Mehmon defaults
-    }
-  }, []);
 
   // Global Period Filter State for Homepage
   const [dashboardPeriod, setDashboardPeriod] = useState<'bugun' | 'hafta' | 'barchasi'>('bugun');
@@ -245,6 +301,33 @@ export default function App() {
   const showWebToast = (msg: string) => {
     setWebToastMessage(msg);
   };
+
+  // Daily SMS interval trigger (24-hour summary at user specified time)
+  useEffect(() => {
+    const checkDailySMS = () => {
+      if (!profile.notificationsEnabled || !profile.notificationTime) return;
+      
+      const now = new Date();
+      const currentHM = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      const todayDateStr = now.toISOString().split('T')[0];
+      const lastSentKey = `daily_sms_sent_${todayDateStr}`;
+
+      if (currentHM === profile.notificationTime && !localStorage.getItem(lastSentKey)) {
+        localStorage.setItem(lastSentKey, 'true');
+        triggerInstantNotification(
+          transactions,
+          currentBalance,
+          profile.currency || 'UZS',
+          showWebToast,
+          profile.phoneNumber
+        );
+      }
+    };
+
+    const interval = setInterval(checkDailySMS, 20000);
+    checkDailySMS();
+    return () => clearInterval(interval);
+  }, [profile.notificationsEnabled, profile.notificationTime, profile.phoneNumber, transactions, currentBalance, profile.currency]);
 
   // Profile updaters
   const handleUpdateProfile = (updatedProfile: UserProfile) => {
@@ -560,6 +643,7 @@ export default function App() {
             transactions={transactions}
             currentBalance={currentBalance}
             onShowWebToast={(msg) => setWebToastMessage(msg)}
+            onLogout={handleLogout}
           />
         );
       case 'about':
@@ -579,7 +663,18 @@ export default function App() {
         onFinish={() => setShowSplash(false)} 
       />
 
-      {/* Dynamic SMS Notification Banner Simulation */}
+      {/* Auth Screen for unauthenticated users */}
+      {!showSplash && !isAuthLoading && !authUser && !isGuestMode && (
+        <AuthScreen 
+          onSuccess={() => {}} 
+          onContinueAsGuest={() => setIsGuestMode(true)}
+        />
+      )}
+
+      {/* Main App interface when authenticated or continuing in guest mode */}
+      {!showSplash && (!isAuthLoading && (authUser || isGuestMode)) && (
+        <>
+          {/* Dynamic SMS Notification Banner Simulation */}
       {webToastMessage && (
         <div className="fixed top-4 left-4 right-4 z-[9999] max-w-sm mx-auto bg-gray-900/95 dark:bg-[#1e293b]/95 backdrop-blur-md rounded-2xl p-4 shadow-2xl border border-white/10 text-white animate-in slide-in-from-top-12 duration-300">
           <div className="flex items-start gap-3">
@@ -616,7 +711,7 @@ export default function App() {
         avatarUrl={profile.avatarUrl} 
         userName={profile.name}
         userEmail={profile.email}
-        onAdminClick={() => setIsAdminOpen(true)}
+        onAdminClick={handleOpenAdminPanel}
         onLogoClick={() => setShowSplash(true)}
       />
 
@@ -725,13 +820,28 @@ export default function App() {
         currency={profile.currency}
       />
 
+      {/* Admin Password Authentication Modal Overlay */}
+      {isAdminAuthModalOpen && (
+        <AdminAuthModal 
+          onClose={() => setIsAdminAuthModalOpen(false)}
+          onSuccess={(verifiedKey) => {
+            setAdminKey(verifiedKey);
+            setIsAdminAuthModalOpen(false);
+            setIsAdminOpen(true);
+          }}
+        />
+      )}
+
       {/* Admin Panel Modal Overlay */}
       {isAdminOpen && (
         <AdminPanel 
+          adminKey={adminKey}
           onClose={() => setIsAdminOpen(false)}
           onAddSampleTransactions={handleAddSampleTransactions}
           onShowWebToast={showWebToast}
         />
+      )}
+        </>
       )}
 
     </div>

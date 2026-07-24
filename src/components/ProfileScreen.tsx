@@ -21,13 +21,21 @@ import {
   BellOff,
   MessageSquare,
   Clock,
-  Send
+  Send,
+  LogOut,
+  ShieldCheck,
+  CloudCheck,
+  Smartphone,
+  FileText
 } from 'lucide-react';
 import { 
   triggerInstantNotification, 
   scheduleDailyReminder, 
-  isNativePlatform 
+  isNativePlatform,
+  getTodaySummary,
+  generateSMSMessage
 } from '../lib/notifications';
+import { exportPDFReport } from '../lib/pdfExporter';
 
 const PRESET_AVATARS = [
   {
@@ -134,6 +142,7 @@ interface ProfileScreenProps {
   transactions: Transaction[];
   currentBalance: number;
   onShowWebToast: (msg: string) => void;
+  onLogout?: () => void;
 }
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
@@ -146,7 +155,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   transactionsJson,
   transactions,
   currentBalance,
-  onShowWebToast
+  onShowWebToast,
+  onLogout
 }) => {
   const [name, setName] = useState(profile.name);
   const [email, setEmail] = useState(profile.email);
@@ -175,6 +185,19 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleTestNotification = async () => {
+    const rawDigits = phoneDigits.replace(/\D/g, '');
+    const formattedPhone = rawDigits.length === 9 ? `+998${rawDigits}` : (profile.phoneNumber || '');
+
+    await triggerInstantNotification(
+      transactions,
+      currentBalance,
+      currency || 'UZS',
+      onShowWebToast,
+      formattedPhone
+    );
+  };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setUploadError('');
@@ -260,29 +283,27 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     setTimeout(() => setSaveSuccess(false), 2500);
   };
 
+  const [pendingImportData, setPendingImportData] = useState<any | null>(null);
+
   const handleExport = () => {
-    const fullBackup = {
-      transactions: JSON.parse(transactionsJson),
-      profile: {
-        ...profile,
-        name,
-        email,
-        avatarUrl,
-        currency,
-        monthlyBudget: monthlyBudget ? parseFloat(monthlyBudget) : undefined
-      },
-      baseBalance
+    let parsedTxs: Transaction[] = [];
+    try {
+      parsedTxs = JSON.parse(transactionsJson);
+    } catch {
+      parsedTxs = transactions;
+    }
+
+    const currentProfile: UserProfile = {
+      ...profile,
+      name,
+      email,
+      avatarUrl,
+      currency,
+      monthlyBudget: monthlyBudget ? parseFloat(monthlyBudget) : undefined,
+      phoneNumber: phoneDigits.trim() ? `+998${phoneDigits.replace(/\s/g, '')}` : profile.phoneNumber
     };
 
-    const blob = new Blob([JSON.stringify(fullBackup, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `moliya_backup_${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    exportPDFReport(parsedTxs, currentProfile, baseBalance);
   };
 
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -291,43 +312,80 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Reset input value
+    e.target.value = '';
+
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
         const text = event.target?.result as string;
         const parsed = JSON.parse(text);
 
-        if (parsed.transactions && Array.isArray(parsed.transactions)) {
-          // Trigger callbacks
-          const success = onImportData(JSON.stringify(parsed.transactions), parsed.profile ? JSON.stringify(parsed.profile) : undefined);
-          
-          if (success) {
-            if (parsed.baseBalance !== undefined) {
-              onUpdateBaseBalance(parseFloat(parsed.baseBalance));
-              setBalanceInput(parsed.baseBalance.toString());
-            }
-            if (parsed.profile) {
-              setName(parsed.profile.name);
-              setEmail(parsed.profile.email);
-              setCurrency(parsed.profile.currency);
-              setMonthlyBudget(parsed.profile.monthlyBudget?.toString() || '');
-              if (parsed.profile.avatarUrl) {
-                setAvatarUrl(parsed.profile.avatarUrl);
-              }
-            }
-            setImportSuccess(true);
-            setTimeout(() => setImportSuccess(false), 3000);
-          } else {
-            setImportError('Ma\'lumotlar formati mos kelmadi.');
+        if (
+          typeof parsed === 'object' &&
+          parsed !== null &&
+          Array.isArray(parsed.transactions)
+        ) {
+          // Validate individual transaction entries
+          const isValid = parsed.transactions.every(
+            (t: any) =>
+              t &&
+              typeof t === 'object' &&
+              t.id &&
+              (t.type === 'kirim' || t.type === 'chiqim') &&
+              !isNaN(Number(t.amount))
+          );
+
+          if (!isValid && parsed.transactions.length > 0) {
+            setImportError('Faylda noto‘g‘ri tranzaksiya ma‘lumotlari mavjud.');
+            return;
           }
+
+          // Request user confirmation before applying import
+          setPendingImportData(parsed);
         } else {
           setImportError('Mos keluvchi zaxira fayli emas (transactions massivi topilmadi).');
         }
       } catch (err) {
-        setImportError('Faylni o\'qishda xatolik yuz berdi. JSON formatini tekshiring.');
+        setImportError('Faylni o‘qishda xatolik yuz berdi. Qayta JSON formatida tekshiring.');
       }
     };
     reader.readAsText(file);
+  };
+
+  const confirmImport = () => {
+    if (!pendingImportData) return;
+    try {
+      const success = onImportData(
+        JSON.stringify(pendingImportData.transactions),
+        pendingImportData.profile ? JSON.stringify(pendingImportData.profile) : undefined
+      );
+
+      if (success) {
+        if (pendingImportData.baseBalance !== undefined) {
+          onUpdateBaseBalance(parseFloat(pendingImportData.baseBalance));
+          setBalanceInput(pendingImportData.baseBalance.toString());
+        }
+        if (pendingImportData.profile) {
+          setName(pendingImportData.profile.name || '');
+          setEmail(pendingImportData.profile.email || '');
+          setCurrency(pendingImportData.profile.currency || 'UZS');
+          setMonthlyBudget(pendingImportData.profile.monthlyBudget?.toString() || '');
+          if (pendingImportData.profile.avatarUrl) {
+            setAvatarUrl(pendingImportData.profile.avatarUrl);
+          }
+        }
+        setImportSuccess(true);
+        setPendingImportData(null);
+        setTimeout(() => setImportSuccess(false), 3000);
+      } else {
+        setImportError('Ma\'lumotlarni yuklashda xatolik yuz berdi.');
+        setPendingImportData(null);
+      }
+    } catch (err) {
+      setImportError('Import jarayonida kutilmagan xatolik yuz berdi.');
+      setPendingImportData(null);
+    }
   };
 
   return (
@@ -517,6 +575,25 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             </p>
           </div>
 
+          {/* Phone Number for SMS */}
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
+              Telefon raqami (SMS xabarnoma uchun)
+            </label>
+            <div className="relative flex items-center">
+              <span className="absolute left-3 text-xs font-bold text-gray-500 dark:text-gray-400 select-none">
+                +998
+              </span>
+              <input
+                type="tel"
+                value={phoneDigits}
+                onChange={(e) => setPhoneDigits(formatUzbekPhone(e.target.value))}
+                placeholder="90 123 45 67"
+                className="w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl pl-14 pr-4 py-2.5 text-sm font-semibold text-gray-900 dark:text-white focus:outline-none focus:border-primary font-tabular"
+              />
+            </div>
+          </div>
+
           <button
             type="submit"
             className="w-full bg-primary hover:bg-primary/95 text-white py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-primary/10 transition-all cursor-pointer active:scale-95 duration-100"
@@ -526,11 +603,123 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         </form>
       </div>
 
+      {/* Clean & Theme-Responsive Automatic SMS Notification Card */}
+      <div className="bg-white dark:bg-[#131b2e] rounded-2xl p-5 border border-gray-100 dark:border-white/5 shadow-sm space-y-4 transition-colors">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 dark:bg-indigo-500/20 border border-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+              <MessageSquare size={20} className="animate-pulse" />
+            </div>
+            <div className="min-w-0">
+              <h4 className="text-sm font-black tracking-tight text-gray-900 dark:text-white flex items-center gap-2 flex-wrap">
+                <span>Avtomatik SMS Xabarnoma</span>
+                <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full border ${
+                  notificationsEnabled 
+                    ? 'bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 border-emerald-500/30' 
+                    : 'bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400 border-gray-200 dark:border-white/10'
+                }`}>
+                  {notificationsEnabled ? 'Yoqilgan' : 'Oʻchirilgan'}
+                </span>
+              </h4>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 font-medium mt-0.5 truncate">
+                Kirim va Chiqimlar haqida telefoningizga avto SMS xabarlar
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setNotificationsEnabled(!notificationsEnabled)}
+            className={`w-11 h-6 rounded-full transition-colors duration-200 p-0.5 flex items-center shrink-0 cursor-pointer ${
+              notificationsEnabled ? 'bg-emerald-500 justify-end' : 'bg-gray-300 dark:bg-gray-600 justify-start'
+            }`}
+          >
+            <div className="w-5 h-5 rounded-full bg-white shadow-md"></div>
+          </button>
+        </div>
+
+        {/* Schedule & Phone info */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-gray-100 dark:border-white/5">
+          <div>
+            <label className="block text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1 flex items-center gap-1.5 whitespace-nowrap">
+              <Clock size={12} className="text-indigo-500 shrink-0" />
+              <span>Kunlik hisobot vaqti</span>
+            </label>
+            <input
+              type="time"
+              value={notificationTime}
+              onChange={(e) => setNotificationTime(e.target.value)}
+              className="w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs font-bold text-gray-900 dark:text-white focus:outline-none focus:border-indigo-500 font-tabular transition-colors"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1 flex items-center gap-1.5 whitespace-nowrap">
+              <Smartphone size={12} className="text-emerald-500 shrink-0" />
+              <span>SMS kelish raqami</span>
+            </label>
+            <div className="w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs font-bold text-emerald-600 dark:text-emerald-400 font-tabular truncate">
+              {phoneDigits ? `+998 ${phoneDigits}` : 'Telefon kiritilmagan'}
+            </div>
+          </div>
+        </div>
+
+        {/* Clean explanatory message */}
+        <div className="bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20 rounded-xl p-3 space-y-2 text-xs text-gray-700 dark:text-indigo-200">
+          <div className="flex items-start gap-2.5">
+            <span className="text-base shrink-0">📱</span>
+            <p className="leading-relaxed text-[11px] text-gray-600 dark:text-indigo-200">
+              <strong className="text-gray-900 dark:text-white font-bold">24 Soatlik Jamlangan Hisobot SMS:</strong> Kirim va chiqimlar kiritilganda darhol SMS bormaydi. Belgilangan vaqtingizda (masalan soat {notificationTime} da) 24 soat (kun) davomida kiritilgan barcha kirim va chiqimlaringiz jamlanib 1 ta umumiy SMS hisoboti ko‘rinishida yuboriladi.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleTestNotification}
+            className="w-full mt-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+          >
+            <Send size={14} />
+            <span>Hozir SMS hisobotini sinab ko‘rish</span>
+          </button>
+        </div>
+      </div>
+
       {/* Backup and diagnostic tools */}
       <div className="bg-white dark:bg-[#131b2e] rounded-2xl p-5 border border-gray-100 dark:border-white/5 shadow-sm space-y-4">
         <h4 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
           Zaxiralash va texnik xizmat
         </h4>
+
+        {/* Pending Import Confirmation Dialog */}
+        {pendingImportData && (
+          <div className="p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 rounded-xl space-y-3 animate-in fade-in">
+            <div className="flex items-start gap-2.5 text-amber-800 dark:text-amber-300 text-xs font-semibold">
+              <Sparkles size={18} className="shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+              <div>
+                <p className="font-extrabold text-sm text-gray-900 dark:text-white">Zaxirani tiklashni tasdiqlaysizmi?</p>
+                <p className="mt-1 text-[11px] text-gray-600 dark:text-gray-300 leading-relaxed">
+                  Ushbu fayl <b>{pendingImportData.transactions?.length || 0} ta</b> tranzaksiyani o‘z ichiga oladi. Tiklash amalga oshirilsa, joriy ma'lumotlaringiz ushbu zaxira bilan almashtiriladi.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={confirmImport}
+                className="flex-1 bg-amber-600 hover:bg-amber-700 text-white py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-sm"
+              >
+                Ha, zaxirani tiklash
+              </button>
+              <button
+                type="button"
+                onClick={() => setPendingImportData(null)}
+                className="flex-1 bg-gray-200 dark:bg-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-white/20 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer"
+              >
+                Bekor qilish
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Import Messages */}
         {importError && (
@@ -545,14 +734,15 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         )}
 
         <div className="grid grid-cols-2 gap-3">
-          {/* Export JSON */}
+          {/* Export PDF */}
           <button
+            type="button"
             onClick={handleExport}
-            className="flex flex-col items-center justify-center p-4 rounded-xl border border-gray-100 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-white/5 text-gray-700 dark:text-gray-300 gap-1.5 transition-all text-xs cursor-pointer active:scale-95 duration-100"
+            className="flex flex-col items-center justify-center p-4 rounded-xl border border-gray-100 dark:border-white/5 hover:bg-indigo-50/50 dark:hover:bg-white/5 text-gray-700 dark:text-gray-300 gap-1.5 transition-all text-xs cursor-pointer active:scale-95 duration-100 group"
           >
-            <Download size={18} className="text-primary dark:text-primary-fixed-dim" />
-            <span className="font-bold">Eksport qilish</span>
-            <span className="text-[10px] text-gray-400 font-medium">Faylga yuklash</span>
+            <FileText size={20} className="text-[#2116d0] dark:text-indigo-400 group-hover:scale-110 transition-transform" />
+            <span className="font-bold">Eksport qilish (PDF)</span>
+            <span className="text-[10px] text-gray-400 font-medium">PDF fayliga yuklash</span>
           </button>
 
           {/* Import JSON file */}
@@ -568,6 +758,18 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             />
           </label>
         </div>
+
+        {/* Logout Button */}
+        {onLogout && (
+          <button
+            type="button"
+            onClick={onLogout}
+            className="w-full flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 dark:bg-white/10 dark:hover:bg-white/15 text-gray-800 dark:text-gray-100 py-3 rounded-xl text-xs font-black transition-all cursor-pointer active:scale-95 duration-100 border border-gray-200 dark:border-white/10 shadow-sm"
+          >
+            <LogOut size={16} className="text-rose-500" />
+            <span>Hisobdan Chiqish (Logout)</span>
+          </button>
+        )}
 
         {/* Master reset database with custom inline confirm */}
         {showResetConfirm ? (

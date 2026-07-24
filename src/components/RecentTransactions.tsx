@@ -112,9 +112,8 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({
                           {formatTxDate(tx.date, tx.time)}
                         </p>
                         {isTransactionLocked(tx) && (
-                          <span className="inline-flex items-center gap-0.5 text-[8.5px] font-extrabold text-amber-700 dark:text-amber-400 bg-amber-100/70 dark:bg-amber-950/40 px-1.5 py-0.5 rounded" title="24 soat o'tgan - Muhrlangan">
-                            <Lock size={8} />
-                            <span>24s muhrlangan</span>
+                          <span className="inline-flex items-center justify-center p-0.5 rounded bg-amber-100/80 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 shrink-0" title="Muhrlangan (24 soat o'tgan)">
+                            <Lock size={10} />
                           </span>
                         )}
                       </div>

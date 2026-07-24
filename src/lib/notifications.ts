@@ -49,17 +49,28 @@ export const getTodaySummary = (transactions: Transaction[], currentBalance: num
   };
 };
 
-// Generate a beautifully formatted SMS / notification message in Uzbek
-export const generateSMSMessage = (summary: DailySummaryData): string => {
-  const spentStr = formatAmount(summary.totalSpent, summary.currency);
-  const remainingStr = formatAmount(summary.remainingBalance, summary.currency);
-  const startStr = formatAmount(summary.startingBalance, summary.currency);
+// Generate a beautifully formatted 24-hour summary SMS / notification message in Uzbek
+export const generateSMSMessage = (summary: DailySummaryData, transactions: Transaction[]): string => {
+  const todayStr = new Date().toISOString().split('T')[0];
+  let todayIncome = 0;
+  let todayExpense = 0;
 
-  if (summary.totalSpent === 0) {
-    return `SmartBudget: Bugun xarajat qilmadingiz! 🌟 Boshlang'ich balans: ${startStr}, Hozirgi qolgan pulingiz: ${remainingStr}. Baraka toping!`;
+  transactions.forEach(t => {
+    if (t.date === todayStr) {
+      if (t.type === 'kirim') todayIncome += t.amount;
+      if (t.type === 'chiqim') todayExpense += t.amount;
+    }
+  });
+
+  const incomeStr = formatAmount(todayIncome, summary.currency);
+  const expenseStr = formatAmount(todayExpense, summary.currency);
+  const remainingStr = formatAmount(summary.remainingBalance, summary.currency);
+
+  if (todayIncome === 0 && todayExpense === 0) {
+    return `SmartBudget: Bugun kirim va chiqim kiritilmadi. 💰 Joriy balans: ${remainingStr}. Baraka toping!`;
   }
 
-  return `SmartBudget: Bugun ${startStr} balansdan ${spentStr} ishlatdingiz. Hozirgi qolgan pulingiz: ${remainingStr}. Xarajatlaringiz nazorati joyida! 🚀`;
+  return `SmartBudget Bugungi Hisobot (24 soatlik): 📥 Kirim: +${incomeStr} UZS, 📤 Chiqim: -${expenseStr} UZS. 💰 Joriy balans: ${remainingStr}.`;
 };
 
 // Request permissions
@@ -103,7 +114,7 @@ export const scheduleDailyReminder = async (
       const minute = parseInt(minuteStr || '00', 10);
 
       const summary = getTodaySummary(transactions, currentBalance, currency);
-      const bodyText = generateSMSMessage(summary);
+      const bodyText = generateSMSMessage(summary, transactions);
 
       // Request permission
       const hasPermission = await requestNotificationPermission();
@@ -152,20 +163,68 @@ export const sendRealSMS = async (phoneNumber: string, message: string): Promise
 
     const data = await response.json();
     if (response.ok && data.success) {
-      return { success: true, msg: data.message };
+      return { success: true, msg: data.message || 'SMS muvaffaqiyatli yuborildi.' };
     } else {
       return { 
         success: false, 
-        msg: data.message || data.error || 'Serverga ulanishda noma\'lum xatolik.' 
+        msg: data.message || data.error || 'SMS yuborish imkoni bo\'lmadi.' 
       };
     }
   } catch (error: any) {
     console.error('Real SMS sending network error:', error);
     return { 
       success: false, 
-      msg: 'Tarmoq xatoligi: SMS provayderiga ulanib bo\'lmadi. (Twilio sozlamalarini tekshiring)' 
+      msg: 'SMS xizmatiga ulanib bo\'lmadi.' 
     };
   }
+};
+
+// Auto SMS handler triggered whenever a user adds or edits a Kirim/Chiqim transaction
+export const sendTransactionAutoSMS = async (
+  transaction: { title: string; amount: number; type: 'kirim' | 'chiqim'; category: string },
+  newBalance: number,
+  currency: string,
+  phoneNumber?: string,
+  onShowInWebToast?: (msg: string) => void
+): Promise<void> => {
+  const amountStr = formatAmount(transaction.amount, currency);
+  const balanceStr = formatAmount(newBalance, currency);
+  const typeText = transaction.type === 'kirim' ? 'Kirim 📥' : 'Chiqim 📤';
+  const prefix = transaction.type === 'kirim' ? '+' : '-';
+
+  const smsText = `SmartBudget: ${prefix}${amountStr} ${typeText} [${transaction.category} - ${transaction.title}]. Joriy balans: ${balanceStr}.`;
+
+  const cleanPhone = phoneNumber ? phoneNumber.trim() : '';
+  const formattedPhone = cleanPhone ? (cleanPhone.startsWith('+') ? cleanPhone : `+998${cleanPhone.replace(/\D/g, '')}`) : '';
+
+  if (formattedPhone) {
+    const res = await sendRealSMS(formattedPhone, smsText);
+    if (res.success) {
+      onShowInWebToast?.(`📲 SMS yuborildi (${formattedPhone}): ${smsText}`);
+      return;
+    }
+  }
+
+  // Native notification or web toast notification
+  if (isNativePlatform()) {
+    try {
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            title: '💬 SmartBudget Avto SMS',
+            body: smsText,
+            id: Math.floor(Math.random() * 100000),
+            sound: 'default'
+          }
+        ]
+      });
+    } catch (e) {
+      console.error('Failed to trigger native notification', e);
+    }
+  }
+
+  // Display notification toast on screen automatically
+  onShowInWebToast?.(`📲 Avto SMS: ${smsText}`);
 };
 
 // Instantly fire a notification (for testing & instant visual feedback)
@@ -177,7 +236,7 @@ export const triggerInstantNotification = async (
   phoneNumber?: string
 ): Promise<void> => {
   const summary = getTodaySummary(transactions, currentBalance, currency);
-  const bodyText = generateSMSMessage(summary);
+  const bodyText = generateSMSMessage(summary, transactions);
 
   // If a phone number is provided, try sending a real SMS through our server api
   if (phoneNumber && phoneNumber.trim()) {
@@ -188,8 +247,8 @@ export const triggerInstantNotification = async (
       onShowInWebToast(`📲 ${smsResult.msg}`);
       return;
     } else {
-      // If server could not send it (e.g. credentials missing), show the simulated preview with twilio info
-      onShowInWebToast(`⚠️ SMS Simulyatsiyasi:\n${smsResult.msg}`);
+      // Show clean simulated SMS report toast without raw error messages
+      onShowInWebToast(`📱 SMS Simulyatsiyasi (${phoneNumber}):\n${bodyText}`);
       return;
     }
   }

@@ -21,12 +21,9 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleTheme, 
   avatarUrl, 
   userName,
-  userEmail,
   onAdminClick,
   onLogoClick
 }) => {
-  const isAdmin = userEmail?.toLowerCase() === 'muhayusuf105@gmail.com';
-
   return (
     <header className="fixed top-0 left-0 right-0 w-full z-50 bg-[#faf8ff] dark:bg-[#131b2e]/95 backdrop-blur-md shadow-sm border-b border-gray-100 dark:border-white/10 flex justify-between items-center px-5 h-16 transition-colors duration-200">
       {/* Left side: SmartBudget Logo and Name */}
@@ -42,11 +39,14 @@ export const Header: React.FC<HeaderProps> = ({
           <h1 className="text-lg sm:text-xl font-extrabold tracking-tight text-gray-900 dark:text-white">
             SmartBudget
           </h1>
-          {isAdmin && (
+          {onAdminClick && (
             <button
-              onClick={onAdminClick}
+              onClick={(e) => {
+                e.stopPropagation();
+                onAdminClick();
+              }}
               className="p-1.5 text-teal-600 bg-teal-500/10 dark:text-teal-400 dark:bg-teal-400/10 rounded-full border border-teal-500/20 dark:border-teal-400/20 cursor-pointer hover:scale-110 active:scale-90 transition-all flex items-center justify-center shrink-0"
-              title="Bulutli Tizim Sozlamalari"
+              title="Admin Panelga Kirish (Parol Bilan)"
             >
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>

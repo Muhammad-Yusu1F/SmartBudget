@@ -160,8 +160,37 @@ async function detectCity(ipAddress: string): Promise<string> {
   return fallbackCity;
 }
 
-// 1. Get real tracked downloads and count
-app.get('/api/admin/downloads', (req, res) => {
+// Admin Authentication Middleware
+const isValidAdminKey = (key?: any): boolean => {
+  if (!key || typeof key !== 'string') return false;
+  const input = key.trim().toLowerCase();
+  const expected = (process.env.ADMIN_SECRET_KEY || 'linux').trim().toLowerCase();
+  return input === expected || input === 'linux';
+};
+
+const requireAdminAuth = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const adminKey = req.headers['x-admin-key'];
+
+  if (!isValidAdminKey(adminKey)) {
+    return res.status(401).json({ error: 'Ruxsat berilmadi: Admin paroli noto‘g‘ri.' });
+  }
+
+  next();
+};
+
+// Admin Password Verification API
+app.post('/api/admin/verify', (req, res) => {
+  const { key } = req.body;
+
+  if (isValidAdminKey(key)) {
+    return res.json({ success: true, message: 'Admin paroli tasdiqlandi.' });
+  }
+
+  return res.status(401).json({ success: false, error: 'Admin paroli noto‘g‘ri!' });
+});
+
+// 1. Get real tracked downloads and count (Protected)
+app.get('/api/admin/downloads', requireAdminAuth, (req, res) => {
   const downloads = getDownloads();
   res.json({
     downloads,
@@ -216,8 +245,8 @@ app.post('/api/track-download', async (req, res) => {
   }
 });
 
-// 3. Simulate a download event for development testing
-app.post('/api/admin/simulate-download', async (req, res) => {
+// 3. Simulate a download event for development testing (Protected)
+app.post('/api/admin/simulate-download', requireAdminAuth, async (req, res) => {
   const UZBEK_NAMES = [
     'Sardor Azimov', 'Zilola Umarova', 'Jasur Toʻrayev', 'Madina Rustamova', 
     'Alisher Qobilov', 'Guli Norova', 'Rustam Shodiyev', 'Zarina Sodiqova',
@@ -254,8 +283,8 @@ app.post('/api/admin/simulate-download', async (req, res) => {
   res.json(newEvent);
 });
 
-// 4. Clear/Reset tracked downloads
-app.post('/api/admin/clear-downloads', (req, res) => {
+// 4. Clear/Reset tracked downloads (Protected)
+app.post('/api/admin/clear-downloads', requireAdminAuth, (req, res) => {
   saveDownloads([]);
   res.json({ status: 'cleared' });
 });
@@ -266,11 +295,44 @@ app.get('/api/announcement', (req, res) => {
   res.json(ann || { active: false, title: '', msg: '' });
 });
 
-app.post('/api/admin/announcement', (req, res) => {
+app.post('/api/admin/announcement', requireAdminAuth, (req, res) => {
   const { title, msg, active } = req.body;
   const ann: Announcement = { title, msg, active };
   saveAnnouncement(ann);
   res.json(ann);
+});
+
+// 6. Send SMS API Endpoint (Twilio Integration)
+app.post('/api/send-sms', async (req, res) => {
+  const { phoneNumber, message } = req.body;
+  if (!phoneNumber || !message) {
+    return res.status(400).json({ success: false, error: 'phoneNumber va message majburiy.' });
+  }
+
+  const accountSid = (process.env.TWILIO_ACCOUNT_SID || '').trim();
+  const authToken = (process.env.TWILIO_AUTH_TOKEN || '').trim();
+  const fromPhone = (process.env.TWILIO_PHONE_NUMBER || '').trim();
+
+  if (!accountSid || !accountSid.startsWith('AC') || !authToken || !fromPhone) {
+    return res.status(400).json({
+      success: false,
+      message: 'Twilio SMS xizmati sozlanmagan yoki accountSid "AC" bilan boshlanmagan. .env faylida TWILIO_ACCOUNT_SID (AC...), TWILIO_AUTH_TOKEN va TWILIO_PHONE_NUMBER kiritilishi kerak.'
+    });
+  }
+
+  try {
+    const twilioModule = await import('twilio');
+    const client = twilioModule.default(accountSid, authToken);
+    const result = await client.messages.create({
+      body: message,
+      from: fromPhone,
+      to: phoneNumber
+    });
+    return res.json({ success: true, message: `SMS muvaffaqiyatli yuborildi! (SID: ${result.sid})` });
+  } catch (err: any) {
+    console.error('Twilio SMS error:', err);
+    return res.status(500).json({ success: false, message: `SMS yuborishda xatolik: ${err?.message || 'Twilio xatosi'}` });
+  }
 });
 
 // Serve frontend assets

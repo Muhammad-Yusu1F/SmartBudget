@@ -29,6 +29,49 @@ export const formatAmount = (amount: number, currency: string): string => {
 };
 
 /**
+ * Formats an amount in a clean compact notation to fit nicely in small UI cards and badges.
+ * E.g., 900000 UZS -> "900k UZS"
+ *       9133211 UZS -> "9.13 mln UZS"
+ *       12500000 UZS -> "12.5 mln UZS"
+ */
+export const formatCompactAmount = (amount: number, currency: string): string => {
+  const isUZS = currency === 'UZS' || currency === 'so\'m' || currency === 'som' || currency === 'soʻm';
+  const abs = Math.abs(amount);
+  const sign = amount < 0 ? '-' : '';
+
+  if (isUZS) {
+    if (abs >= 1_000_000_000) {
+      const val = (abs / 1_000_000_000).toFixed(2).replace(/\.?0+$/, '');
+      return `${sign}${val}\u00A0mlrd UZS`;
+    }
+    if (abs >= 1_000_000) {
+      const val = (abs / 1_000_000).toFixed(2).replace(/\.?0+$/, '');
+      return `${sign}${val}\u00A0mln UZS`;
+    }
+    if (abs >= 1_000) {
+      const val = (abs / 1_000).toFixed(1).replace(/\.?0+$/, '');
+      return `${sign}${val}k\u00A0UZS`;
+    }
+    return `${sign}${abs}\u00A0UZS`;
+  }
+
+  // Non-UZS (e.g. USD)
+  if (abs >= 1_000_000_000) {
+    const val = (abs / 1_000_000_000).toFixed(2).replace(/\.?0+$/, '');
+    return `${sign}${currency}${val}B`;
+  }
+  if (abs >= 1_000_000) {
+    const val = (abs / 1_000_000).toFixed(2).replace(/\.?0+$/, '');
+    return `${sign}${currency}${val}M`;
+  }
+  if (abs >= 1_000) {
+    const val = (abs / 1_000).toFixed(1).replace(/\.?0+$/, '');
+    return `${sign}${currency}${val}k`;
+  }
+  return formatAmount(amount, currency);
+};
+
+/**
  * Returns a signed formatted amount with "+" or "-" prefix.
  */
 export const formatSignedAmount = (amount: number, type: 'kirim' | 'chiqim', currency: string): string => {

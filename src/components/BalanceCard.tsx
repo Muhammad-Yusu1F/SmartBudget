@@ -35,7 +35,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({
               <p className="text-xs font-bold uppercase tracking-wider text-white/80 mb-1 flex items-center gap-1.5">
                 <span>Balans ({periodLabel})</span>
               </p>
-              <h2 className="text-2xl min-[370px]:text-3xl min-[420px]:text-4xl font-extrabold tracking-tight font-tabular whitespace-nowrap">
+              <h2 className="text-xl min-[360px]:text-2xl min-[400px]:text-3xl min-[460px]:text-4xl font-extrabold tracking-tight font-tabular truncate max-w-full" title={formatAmount(balance, currency)}>
                 {formatAmount(balance, currency)}
               </h2>
             </div>

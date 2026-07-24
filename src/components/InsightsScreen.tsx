@@ -22,7 +22,7 @@ import {
 import { Transaction } from '../types';
 import { getCategoryStyles } from './CategoryIcon';
 import { TrendingUp, TrendingDown, Landmark, PieChart as PieIcon } from 'lucide-react';
-import { formatAmount } from '../lib/format';
+import { formatAmount, formatCompactAmount } from '../lib/format';
 
 interface InsightsScreenProps {
   transactions: Transaction[];
@@ -205,29 +205,29 @@ export const InsightsScreen: React.FC<InsightsScreenProps> = ({ transactions, cu
       </div>
 
       {/* Grid of high-level savings stats */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white dark:bg-[#131b2e] rounded-2xl p-4 border border-gray-100 dark:border-white/5 shadow-sm">
-          <div className="flex items-center gap-2 mb-1.5">
-            <Landmark size={16} className="text-primary dark:text-primary-fixed-dim" />
-            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Jamg'arma ko'rsatkichi</span>
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
+        <div className="bg-white dark:bg-[#131b2e] rounded-2xl p-3.5 sm:p-4 border border-gray-100 dark:border-white/5 shadow-sm min-w-0 overflow-hidden">
+          <div className="flex items-center gap-1.5 mb-1.5 min-w-0">
+            <Landmark size={16} className="text-primary dark:text-primary-fixed-dim shrink-0" />
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 truncate">Jamg'arma ko'rsatkichi</span>
           </div>
-          <p className="text-xl font-bold text-gray-900 dark:text-white tracking-tight font-tabular">
-            {formatAmount(netSavings, currency)}
+          <p className="text-base min-[380px]:text-lg sm:text-xl font-bold text-gray-900 dark:text-white tracking-tight font-tabular truncate" title={formatAmount(netSavings, currency)}>
+            {formatCompactAmount(netSavings, currency)}
           </p>
-          <p className="text-[10px] text-gray-400 dark:text-gray-500 font-semibold mt-1">
+          <p className="text-[10px] text-gray-400 dark:text-gray-500 font-semibold mt-1 truncate">
             Kirim va Chiqim orasidagi farq
           </p>
         </div>
 
-        <div className="bg-white dark:bg-[#131b2e] rounded-2xl p-4 border border-gray-100 dark:border-white/5 shadow-sm">
-          <div className="flex items-center gap-2 mb-1.5">
-            <TrendingUp size={16} className="text-emerald-500" />
-            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Jamg'arma ulushi</span>
+        <div className="bg-white dark:bg-[#131b2e] rounded-2xl p-3.5 sm:p-4 border border-gray-100 dark:border-white/5 shadow-sm min-w-0 overflow-hidden">
+          <div className="flex items-center gap-1.5 mb-1.5 min-w-0">
+            <TrendingUp size={16} className="text-emerald-500 shrink-0" />
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 truncate">Jamg'arma ulushi</span>
           </div>
-          <p className="text-xl font-bold text-gray-900 dark:text-white tracking-tight font-tabular">
+          <p className="text-base min-[380px]:text-lg sm:text-xl font-bold text-gray-900 dark:text-white tracking-tight font-tabular truncate">
             {savingsRate}%
           </p>
-          <p className="text-[10px] text-gray-400 dark:text-gray-500 font-semibold mt-1">
+          <p className="text-[10px] text-gray-400 dark:text-gray-500 font-semibold mt-1 truncate">
             Kirimdan saqlab qolingan qismi
           </p>
         </div>

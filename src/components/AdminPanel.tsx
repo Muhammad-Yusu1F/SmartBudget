@@ -25,7 +25,8 @@ import {
   Server,
   AlertCircle,
   Coins,
-  Cloud
+  Cloud,
+  ShieldCheck
 } from 'lucide-react';
 
 interface DownloadEvent {
@@ -40,12 +41,14 @@ interface DownloadEvent {
 }
 
 interface AdminPanelProps {
+  adminKey: string;
   onClose: () => void;
   onAddSampleTransactions: () => void;
   onShowWebToast: (msg: string) => void;
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({ 
+  adminKey,
   onClose, 
   onAddSampleTransactions,
   onShowWebToast 
@@ -67,14 +70,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const fetchDownloads = async (silent = false) => {
     if (!silent) setIsRefreshing(true);
     try {
-      const response = await fetch('/api/admin/downloads');
+      const response = await fetch('/api/admin/downloads', {
+        headers: {
+          'x-admin-key': adminKey || 'linux'
+        }
+      });
       if (response.ok) {
         const data = await response.json();
         setDownloads(data.downloads || []);
         setTotalCounter(data.totalCounter || 0);
+        setAdminError('');
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        setAdminError(errData.error || 'Yuklashlar ma\'lumotini olishda xatolik yuz berdi.');
       }
     } catch (err) {
-      console.error('Error fetching downloads:', err);
+      // Gentle error logging to prevent app crashes on network drop
+      if (!silent) {
+        setAdminError('Server bilan ulanib bo‘lmadi.');
+      }
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -106,13 +120,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }, 10000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [adminKey]);
 
   // Simulate new install event on the server-side DB
   const handleSimulateInstall = async () => {
     try {
       const response = await fetch('/api/admin/simulate-download', {
         method: 'POST',
+        headers: {
+          'x-admin-key': adminKey || 'linux'
+        }
       });
       if (response.ok) {
         const newEvent = await response.json();
@@ -120,7 +137,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         fetchDownloads(true);
       }
     } catch (err) {
-      console.error('Error simulating install:', err);
+      console.warn('Simulate install request failed:', err);
     }
   };
 
@@ -129,13 +146,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     try {
       const response = await fetch('/api/admin/clear-downloads', {
         method: 'POST',
+        headers: {
+          'x-admin-key': adminKey || 'linux'
+        }
       });
       if (response.ok) {
         onShowWebToast('Tizim yuklashlar tarixi muvaffaqiyatli tozalandi.');
         fetchDownloads(true);
       }
     } catch (err) {
-      console.error('Error clearing downloads:', err);
+      console.warn('Clear downloads request failed:', err);
     }
     setShowResetDownloadsConfirm(false);
   };
@@ -152,7 +172,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     try {
       const response = await fetch('/api/admin/announcement', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-admin-key': adminKey || 'linux'
+        },
         body: JSON.stringify({
           title: announcementTitle.trim(),
           msg: announcementMsg.trim(),
@@ -167,7 +190,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         onShowWebToast('Tizim eʻloni serverda barcha foydalanuvchilar uchun chop etildi!');
       }
     } catch (err) {
-      console.error('Error publishing announcement:', err);
+      console.warn('Publish announcement failed:', err);
     }
   };
 
@@ -176,7 +199,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     try {
       const response = await fetch('/api/admin/announcement', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-admin-key': adminKey || 'linux'
+        },
         body: JSON.stringify({
           title: '',
           msg: '',
@@ -367,17 +393,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             )}
           </div>
 
-          {/* 4. Tizim E'lonlari Manager */}
+          {/* 4. Tizim E'lonlari va Broadcast Manager (Admin Huquqi) */}
           <div className="bg-white dark:bg-[#131b2e] p-4 rounded-2xl border border-gray-200 dark:border-white/5 shadow-sm space-y-3.5">
-            <h4 className="text-xs font-black uppercase tracking-wider text-gray-400 dark:text-gray-500 flex items-center gap-1.5">
-              <Radio size={13} className="text-emerald-500 animate-pulse" />
-              Tizim Eʻlonlari va Bildirishnomalar
-            </h4>
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-black uppercase tracking-wider text-gray-400 dark:text-gray-500 flex items-center gap-1.5">
+                <Radio size={13} className="text-emerald-500 animate-pulse" />
+                Barcha Foydalanuvchilarga Xabar Yuborish
+              </h4>
+              <span className="text-[9px] font-extrabold uppercase tracking-wider bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded-full border border-indigo-500/20 flex items-center gap-1">
+                <ShieldCheck size={10} /> Faqat Admin Huquqi
+              </span>
+            </div>
 
             {isAnnouncementActive && (
-              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl space-y-1.5 relative">
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl space-y-1.5 relative animate-in fade-in">
                 <span className="absolute top-2 right-2 text-[8px] uppercase tracking-widest font-black text-emerald-500 bg-emerald-500/20 px-1.5 py-0.5 rounded animate-pulse">
-                  Chop etilgan
+                  Barcha Ekranlarda Faol
                 </span>
                 <p className="text-xs font-black text-gray-900 dark:text-white flex items-center gap-1">
                   <Volume2 size={12} className="text-emerald-500" />
@@ -390,24 +421,63 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   onClick={handleDisableAnnouncement}
                   className="text-[9px] font-black text-rose-500 hover:text-rose-600 transition-colors uppercase tracking-wider block mt-1 cursor-pointer"
                 >
-                  Eʻlonni serverdan oʻchirish
+                  Eʻlonni oʻchirish (Stop Broadcast)
                 </button>
               </div>
             )}
+
+            {/* Quick Templates */}
+            <div className="space-y-1">
+              <span className="text-[9px] font-extrabold uppercase tracking-widest text-gray-400">
+                Tayyor shablonlar:
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAnnouncementTitle("🚀 Yangilanish va Yangi Funksiyalar!");
+                    setAnnouncementMsg("SmartBudget ilovasida yangi qulayliklar ishga tushdi. Foydalaning va rohatlaning!");
+                  }}
+                  className="text-[9px] bg-gray-100 dark:bg-white/5 hover:bg-indigo-500/10 hover:text-indigo-600 text-gray-600 dark:text-gray-300 font-bold px-2 py-1 rounded-lg border border-gray-200 dark:border-white/5 transition-all cursor-pointer"
+                >
+                  🚀 Yangilanish
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAnnouncementTitle("💬 Muhim SMS Xabarnoma!");
+                    setAnnouncementMsg("Kunlik xarajatlaringizni nazorat qilish uchun Profil bo'limidan SMS xabarnomani yoqib qo'ying.");
+                  }}
+                  className="text-[9px] bg-gray-100 dark:bg-white/5 hover:bg-emerald-500/10 hover:text-emerald-600 text-gray-600 dark:text-gray-300 font-bold px-2 py-1 rounded-lg border border-gray-200 dark:border-white/5 transition-all cursor-pointer"
+                >
+                  💬 SMS Bildirishnoma
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAnnouncementTitle("⚠️ Texnik Profilaktika");
+                    setAnnouncementMsg("Tizimda qisqa muddatli texnik ishlar olib borilmoqda. Ma'lumotlaringiz xavfsiz saqlanmoqda.");
+                  }}
+                  className="text-[9px] bg-gray-100 dark:bg-white/5 hover:bg-amber-500/10 hover:text-amber-600 text-gray-600 dark:text-gray-300 font-bold px-2 py-1 rounded-lg border border-gray-200 dark:border-white/5 transition-all cursor-pointer"
+                >
+                  ⚠️ Texnik profilaktika
+                </button>
+              </div>
+            </div>
 
             <form onSubmit={handlePublishAnnouncement} className="space-y-3">
               <div>
                 <input 
                   type="text" 
-                  placeholder="E'lon Sarlavhasi (Masalan: Yangilanish!)"
+                  placeholder="Xabar Sarlavhasi (Masalan: Barchaga salom!)"
                   value={announcementTitle}
                   onChange={(e) => setAnnouncementTitle(e.target.value)}
-                  className="w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-indigo-500 font-semibold"
                 />
               </div>
               <div>
                 <textarea 
-                  placeholder="Foydalanuvchilarga koʻrsatiladigan tizim xabari matni..."
+                  placeholder="Barcha foydalanuvchilarga yuboriladigan xabar matnini kiriting..."
                   value={announcementMsg}
                   onChange={(e) => setAnnouncementMsg(e.target.value)}
                   rows={2}
@@ -421,9 +491,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               )}
               <button
                 type="submit"
-                className="w-full bg-[#2116d0] hover:bg-[#1b12b5] text-white py-2.5 rounded-xl text-[11px] font-black transition-all cursor-pointer shadow-md shadow-indigo-500/10 text-center"
+                className="w-full bg-gradient-to-r from-[#2116d0] to-indigo-700 hover:from-[#1b12b5] hover:to-indigo-800 text-white py-2.5 rounded-xl text-[11px] font-black transition-all cursor-pointer shadow-md shadow-indigo-500/20 text-center flex items-center justify-center gap-2 active:scale-95"
               >
-                Yangi E'lonni Chop Etish
+                <Radio size={14} />
+                <span>Barcha Foydalanuvchilarga Xabar Yuborish</span>
               </button>
             </form>
           </div>
