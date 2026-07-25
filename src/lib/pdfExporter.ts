@@ -11,7 +11,7 @@ const cleanText = (str: string | undefined | null): string => {
     .replace(/[“”]/g, '"');
 };
 
-export const exportPDFReport = (
+export const exportPDFReport = async (
   transactions: Transaction[],
   profile: UserProfile,
   baseBalance: number
@@ -110,7 +110,8 @@ export const exportPDFReport = (
     t.date || '',
     t.type === 'kirim' ? 'Kirim (+)' : 'Chiqim (-)',
     cleanText(t.category),
-    cleanText(t.description || '-'),
+    cleanText(t.description || (t.receiptImage ? '[Chek biriktirilgan]' : '-')),
+    t.receiptImage ? 'Mavjud (Chek)' : '-',
     t.type === 'kirim' 
       ? `+${formatAmount(t.amount, currency)}` 
       : `-${formatAmount(t.amount, currency)}`,
@@ -118,44 +119,82 @@ export const exportPDFReport = (
 
   autoTable(doc, {
     startY: 102,
-    head: [['№', 'Sana', 'Turi', 'Kategoriya', 'Izoh', 'Summa']],
+    head: [['№', 'Sana', 'Turi', 'Kategoriya', 'Izoh', 'Chek', 'Summa']],
     body: tableData,
     theme: 'grid',
     headStyles: {
       fillColor: [33, 22, 208],
       textColor: [255, 255, 255],
       fontStyle: 'bold',
-      fontSize: 9,
+      fontSize: 8.5,
       halign: 'left',
     },
     bodyStyles: {
-      fontSize: 8.5,
+      fontSize: 8,
       textColor: [50, 50, 50],
     },
     columnStyles: {
-      0: { cellWidth: 10, halign: 'center' },
-      1: { cellWidth: 26 },
-      2: { cellWidth: 24, fontStyle: 'bold' },
-      3: { cellWidth: 38 },
-      4: { cellWidth: 44 },
-      5: { cellWidth: 40, halign: 'right', fontStyle: 'bold' },
+      0: { cellWidth: 8, halign: 'center' },
+      1: { cellWidth: 24 },
+      2: { cellWidth: 22, fontStyle: 'bold' },
+      3: { cellWidth: 32 },
+      4: { cellWidth: 38 },
+      5: { cellWidth: 22, halign: 'center' },
+      6: { cellWidth: 36, halign: 'right', fontStyle: 'bold' },
     },
     didParseCell: (data) => {
       // Colorize the type and amount columns
       if (data.section === 'body') {
         const rowData = transactions[data.row.index];
         if (rowData && rowData.type === 'kirim') {
-          if (data.column.index === 2 || data.column.index === 5) {
+          if (data.column.index === 2 || data.column.index === 6) {
             data.cell.styles.textColor = [16, 122, 87]; // Green
           }
         } else if (rowData && rowData.type === 'chiqim') {
-          if (data.column.index === 2 || data.column.index === 5) {
+          if (data.column.index === 2 || data.column.index === 6) {
             data.cell.styles.textColor = [200, 30, 30]; // Red
           }
         }
       }
     },
   });
+
+  // 5. Embed attached receipt photos gallery section at the end of the PDF
+  const receipts = transactions.filter((t) => t.receiptImage);
+  if (receipts.length > 0) {
+    doc.addPage();
+    doc.setFillColor(33, 22, 208);
+    doc.rect(0, 0, 210, 18, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Biriktirilgan AI Cheklar va Kvitansiyalar Gallerya', 14, 12);
+
+    let yOffset = 25;
+    receipts.forEach((rx, idx) => {
+      if (yOffset > 220) {
+        doc.addPage();
+        yOffset = 20;
+      }
+      doc.setTextColor(40, 40, 40);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text(
+        `${idx + 1}. ${cleanText(rx.title)} (${rx.date} - ${formatAmount(rx.amount, currency)})`,
+        14,
+        yOffset
+      );
+      yOffset += 5;
+
+      try {
+        doc.addImage(rx.receiptImage!, 'JPEG', 14, yOffset, 65, 65);
+        yOffset += 72;
+      } catch (e) {
+        console.error('PDF receipt image embed error:', e);
+        yOffset += 10;
+      }
+    });
+  }
 
   // Footer on each page
   const pageCount = (doc as any).internal.getNumberOfPages();
@@ -171,7 +210,48 @@ export const exportPDFReport = (
     );
   }
 
-  // Save the generated PDF file
+  // Save or share the generated PDF file across desktop and mobile devices
   const filename = `smartbudget_hisobot_${new Date().toISOString().split('T')[0]}.pdf`;
-  doc.save(filename);
+  
+  try {
+    // 1. Primary: Standard jsPDF download trigger
+    doc.save(filename);
+
+    const pdfBlob = doc.output('blob');
+    const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
+
+    // 2. Web Share API (native share/save to Files/Drive/Gallery on iOS Safari & Android Chrome)
+    if (typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+      try {
+        await navigator.share({
+          files: [pdfFile],
+          title: 'SmartBudget Hisoboti',
+          text: `${cleanText(profile.name) || 'Foydalanuvchi'}ning SmartBudget hisoboti (PDF)`,
+        });
+        return;
+      } catch (shareErr: any) {
+        if (shareErr.name === 'AbortError') return;
+      }
+    }
+
+    // 3. Fallback: Blob URL window open / link click for iframe preview sandbox
+    const blobUrl = URL.createObjectURL(pdfBlob);
+    const openedWin = window.open(blobUrl, '_blank');
+    if (!openedWin) {
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    setTimeout(() => {
+      URL.revokeObjectURL(blobUrl);
+    }, 15000);
+  } catch (err) {
+    console.error('PDF generation or download error:', err);
+    doc.save(filename);
+  }
 };

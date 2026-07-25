@@ -23,7 +23,9 @@ import {
   TrendingDown,
   ChevronRight,
   Coins,
-  Lock
+  Lock,
+  Camera,
+  Pencil
 } from 'lucide-react';
 import { Transaction, TransactionType } from '../types';
 import { CategoryIcon, getCategoryStyles } from './CategoryIcon';
@@ -79,9 +81,7 @@ const formatDateUzbek = (dateStr: string) => {
   }
 
   const [year, month, day] = dateStr.split('-');
-  const monthName = getUzbekMonthName(parseInt(month) - 1);
-  const weekday = getUzbekWeekdayName(dateStr);
-  return `${parseInt(day)}-${monthName}, ${year} (${weekday})`;
+  return `${day}.${month}.${year}`;
 };
 
 const getMondayOfDate = (dateStr: string): string => {
@@ -140,6 +140,7 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
   const [expandedDays, setExpandedDays] = useState<{[key: string]: boolean}>({});
   const [expandedWeeks, setExpandedWeeks] = useState<{[key: string]: boolean}>({});
   const [expandedItems, setExpandedItems] = useState<{[key: string]: boolean}>({});
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   // Sort transactions newest first (by date then by time)
   const sortedTxs = [...transactions].sort((a, b) => {
@@ -376,60 +377,89 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
                         const isItemExpanded = expandedItems[tx.id];
 
                         return (
-                          <div key={tx.id} className="py-3.5 first:pt-2.5 last:pb-1">
+                          <div key={tx.id} className="py-2.5 first:pt-2 last:pb-1">
                             <div 
-                              onClick={() => onTransactionClick(tx)}
-                              className="flex items-center justify-between cursor-pointer group"
+                              onClick={(e) => {
+                                if (hasItems || tx.receiptImage) {
+                                  toggleItemExpand(e, tx.id);
+                                }
+                              }}
+                              className="flex items-center justify-between cursor-pointer group gap-2"
+                              title={hasItems || tx.receiptImage ? "Tafsilotlarni ko'rish" : "Tahlil"}
                             >
-                              <div className="flex items-center gap-3">
-                                <div className={`w-9 h-9 rounded-xl ${styles.bg} ${styles.text} flex items-center justify-center shrink-0`}>
+                              <div className="flex items-center gap-3 min-w-0 flex-1">
+                                <div className={`w-9 h-9 rounded-xl ${styles.bg} ${styles.text} flex items-center justify-center shrink-0 shadow-2xs`}>
                                   <CategoryIcon category={tx.category} size={16} />
                                 </div>
-                                <div className="min-w-0">
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <p className="font-bold text-xs text-gray-800 dark:text-gray-200 group-hover:text-primary dark:group-hover:text-primary-fixed-dim transition-colors truncate max-w-[150px] sm:max-w-[220px]">
-                                      {tx.title}
-                                    </p>
-                                    {hasItems && (
-                                      <span 
-                                        onClick={(e) => toggleItemExpand(e, tx.id)}
-                                        className="inline-flex items-center gap-0.5 text-[9px] font-extrabold bg-primary/10 hover:bg-primary/25 text-primary dark:text-primary-fixed-dim px-1.5 py-0.5 rounded-md transition-colors"
-                                      >
-                                        <ShoppingBag size={8} />
-                                        <span>{tx.items?.length} narsa</span>
-                                        {isItemExpanded ? <ChevronUp size={8} /> : <ChevronDown size={8} />}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                                    <span className="text-[10px] text-gray-400 dark:text-gray-500 font-bold flex items-center gap-0.5">
+                                <div className="min-w-0 flex-1 space-y-0.5">
+                                  <p className="font-bold text-xs text-gray-800 dark:text-gray-200 group-hover:text-primary dark:group-hover:text-primary-fixed-dim transition-colors truncate">
+                                    {tx.title}
+                                  </p>
+                                  <div className="flex items-center gap-1.5 text-[10px] text-gray-400 dark:text-gray-500 font-medium truncate">
+                                    <span className="flex items-center gap-0.5 shrink-0">
                                       <Clock size={9} />
                                       {tx.time}
                                     </span>
+                                    {hasItems && (
+                                      <button 
+                                        type="button"
+                                        onClick={(e) => toggleItemExpand(e, tx.id)}
+                                        className="inline-flex items-center gap-0.5 text-[9px] font-extrabold text-primary dark:text-primary-fixed-dim bg-primary/10 hover:bg-primary/20 px-1 py-0.5 rounded transition-colors shrink-0 cursor-pointer"
+                                        title={`${tx.items?.length} ta mahsulot xaridi`}
+                                      >
+                                        <ShoppingBag size={10} />
+                                        {isItemExpanded ? <ChevronUp size={8} /> : <ChevronDown size={8} />}
+                                      </button>
+                                    )}
+                                    {tx.receiptImage && (
+                                      <button 
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setPreviewImage(tx.receiptImage || null);
+                                        }}
+                                        className="inline-flex items-center justify-center text-violet-700 dark:text-violet-300 bg-violet-100 dark:bg-violet-950/60 hover:bg-violet-200 dark:hover:bg-violet-900/60 p-0.5 rounded border border-violet-200 dark:border-violet-800/40 shrink-0 transition-colors cursor-pointer"
+                                        title="Biriktirilgan chekni ko'rish"
+                                      >
+                                        <Camera size={10} />
+                                      </button>
+                                    )}
                                     {isTransactionLocked(tx) && (
-                                      <span className="inline-flex items-center justify-center p-0.5 rounded bg-amber-100/80 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 shrink-0" title="Muhrlangan (24 soat o'tgan)">
+                                      <span className="p-0.5 rounded bg-amber-100/80 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 shrink-0" title="Muhrlangan (24 soat o'tgan)">
                                         <Lock size={9} />
                                       </span>
                                     )}
                                     {tx.description && (
-                                      <>
-                                        <span className="w-1 h-1 bg-gray-200 dark:bg-gray-800 rounded-full"></span>
-                                        <p className="text-[10px] text-gray-400 dark:text-gray-500 truncate max-w-[120px]">
-                                          {tx.description}
-                                        </p>
-                                      </>
+                                      <span className="truncate max-w-[100px] text-gray-400 dark:text-gray-500">
+                                        • {tx.description}
+                                      </span>
                                     )}
                                   </div>
                                 </div>
                               </div>
 
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1.5 shrink-0 text-right ml-2">
                                 <span className={`font-extrabold text-xs tracking-tight font-tabular ${
                                   isExp ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'
                                 }`}>
                                   {formatSignedAmount(tx.amount, tx.type, currency)}
                                 </span>
-                                <ChevronRight size={12} className="text-gray-300 dark:text-gray-600" />
+                                {(hasItems || tx.receiptImage) && (
+                                  <span className="text-gray-400">
+                                    {isItemExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onTransactionClick(tx);
+                                  }}
+                                  className="p-1 rounded text-gray-400 hover:text-primary dark:hover:text-primary-fixed-dim hover:bg-gray-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                                  title="Tahrirlash modalini ochish"
+                                >
+                                  <Pencil size={11} />
+                                </button>
                               </div>
                             </div>
 
@@ -680,69 +710,106 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
                 return (
                   <div
                     key={tx.id}
-                    onClick={() => onTransactionClick(tx)}
-                    className="bg-white dark:bg-[#131b2e] p-4 rounded-2xl border border-gray-100 dark:border-white/5 hover:border-primary/30 dark:hover:border-primary-fixed-dim/30 transition-all cursor-pointer group active:scale-[0.99] shadow-sm hover:shadow-md space-y-3"
+                    onClick={(e) => {
+                      if (hasItems || tx.receiptImage) {
+                        toggleItemExpand(e, tx.id);
+                      }
+                    }}
+                    className="bg-white dark:bg-[#131b2e] p-3.5 sm:p-4 rounded-2xl border border-gray-100 dark:border-white/5 hover:border-primary/30 dark:hover:border-primary-fixed-dim/30 transition-all cursor-pointer group active:scale-[0.99] shadow-xs hover:shadow-md"
+                    title={hasItems || tx.receiptImage ? "Tafsilotlarni ko'rish" : "Tahlil"}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className={`w-11 h-11 rounded-full ${styles.bg} ${styles.text} flex items-center justify-center transition-transform group-hover:scale-105 duration-200`}>
+                    <div className="flex items-center justify-between gap-3 min-h-[48px]">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className={`w-11 h-11 rounded-2xl ${styles.bg} ${styles.text} flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 duration-200 shadow-xs`}>
                           <CategoryIcon category={tx.category} size={20} />
                         </div>
-                        <div>
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <p className="font-semibold text-sm text-gray-800 dark:text-gray-200 group-hover:text-primary dark:group-hover:text-primary-fixed-dim transition-colors">
-                              {tx.title}
-                            </p>
+                        <div className="min-w-0 flex-1 space-y-0.5">
+                          <p className="font-bold text-sm text-gray-900 dark:text-gray-100 group-hover:text-primary dark:group-hover:text-primary-fixed-dim transition-colors truncate">
+                            {tx.title}
+                          </p>
+                          <div className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500 font-medium truncate">
+                            <span className="shrink-0">{formatDateUzbek(tx.date)}, {tx.time}</span>
                             {hasItems && (
-                              <span 
+                              <button 
+                                type="button"
                                 onClick={(e) => toggleItemExpand(e, tx.id)}
-                                className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary/10 hover:bg-primary/25 text-primary dark:text-primary-fixed-dim px-2 py-0.5 rounded-full border border-primary/10 transition-colors"
+                                className="inline-flex items-center gap-0.5 text-[10px] font-extrabold text-primary dark:text-primary-fixed-dim bg-primary/10 hover:bg-primary/20 px-1.5 py-0.5 rounded-full border border-primary/10 transition-colors shrink-0 cursor-pointer"
+                                title={`${tx.items?.length} ta mahsulot xaridi`}
                               >
-                                <ShoppingBag size={10} />
-                                <span>{tx.items?.length} mahsulot</span>
+                                <ShoppingBag size={11} />
                                 {isExpanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
-                              </span>
+                              </button>
                             )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">
-                              {formatDateUzbek(tx.date)}, {tx.time}
-                            </p>
-                            {tx.description && (
-                              <>
-                                <span className="w-1 h-1 bg-gray-300 dark:bg-gray-700 rounded-full"></span>
-                                <p className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-[120px] sm:max-w-[180px]">
-                                  {tx.description}
-                                </p>
-                              </>
+                            {tx.receiptImage && (
+                              <button 
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPreviewImage(tx.receiptImage || null);
+                                }}
+                                className="inline-flex items-center justify-center text-violet-700 dark:text-violet-300 bg-violet-100 dark:bg-violet-950/60 hover:bg-violet-200 dark:hover:bg-violet-900/60 p-1 rounded-full border border-violet-200 dark:border-violet-800/40 shrink-0 transition-colors cursor-pointer"
+                                title="Biriktirilgan chekni ko'rish"
+                              >
+                                <Camera size={11} />
+                              </button>
+                            )}
+                            {isTransactionLocked(tx) && (
+                              <span className="p-0.5 rounded bg-amber-100/80 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 shrink-0" title="Muhrlangan (24 soat o'tgan)">
+                                <Lock size={10} />
+                              </span>
                             )}
                           </div>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <span className={`font-bold text-sm tracking-tight font-tabular ${
+                      <div className="flex flex-col items-end shrink-0 pl-2 text-right">
+                        <span className={`font-extrabold text-sm sm:text-base tracking-tight font-tabular whitespace-nowrap ${
                           isExpense 
                             ? 'text-rose-600 dark:text-rose-400' 
                             : 'text-emerald-600 dark:text-emerald-400'
                         }`}>
                           {formatSignedAmount(tx.amount, tx.type, currency)}
                         </span>
-                        {hasItems && (
+                        <div className="flex items-center gap-1.5 mt-0.5">
                           <button
-                            onClick={(e) => toggleItemExpand(e, tx.id)}
-                            className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors cursor-pointer"
-                            title="Mahsulotlarni ko'rish"
+                            type="button"
+                            onClick={(e) => {
+                              if (hasItems || tx.receiptImage) {
+                                toggleItemExpand(e, tx.id);
+                              }
+                            }}
+                            className={`flex items-center gap-1 group/cat rounded px-1 transition-colors ${
+                              (hasItems || tx.receiptImage) ? 'hover:bg-gray-100 dark:hover:bg-white/10 cursor-pointer' : ''
+                            }`}
+                            title={hasItems || tx.receiptImage ? "Mahsulotlarni ko'rish" : tx.category}
                           >
-                            {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                            <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500">
+                              {tx.category}
+                            </span>
+                            {(hasItems || tx.receiptImage) && (
+                              <span className="text-gray-400 group-hover/cat:text-primary dark:group-hover/cat:text-primary-fixed-dim transition-colors">
+                                {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                              </span>
+                            )}
                           </button>
-                        )}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onTransactionClick(tx);
+                            }}
+                            className="p-1 rounded-lg text-gray-400 hover:text-primary hover:bg-gray-100 dark:hover:bg-white/10 transition-colors shrink-0 cursor-pointer"
+                            title="Tahrirlash modalini ochish"
+                          >
+                            <Pencil size={12} />
+                          </button>
+                        </div>
                       </div>
                     </div>
 
                     {hasItems && isExpanded && (
                       <div 
-                        className="pt-3 border-t border-gray-100 dark:border-white/5 space-y-2 animate-in slide-in-from-top-2 duration-200"
+                        className="mt-3 pt-3 border-t border-gray-100 dark:border-white/5 space-y-2 animate-in slide-in-from-top-2 duration-200"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <div className="flex items-center gap-1 text-[10px] font-bold uppercase text-gray-400 dark:text-gray-500 tracking-wider">
@@ -750,16 +817,16 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
                           <span>Xarid qilingan narsalar va xarajatlar ro'yxati</span>
                         </div>
                         
-                        <div className="grid grid-cols-1 gap-1.5 pl-2">
+                        <div className="grid grid-cols-1 gap-1.5 pl-1">
                           {tx.items?.map((item, idx) => (
                             <div 
                               key={item.id || idx} 
-                              className="flex justify-between items-center text-xs py-1.5 px-2.5 bg-gray-50 dark:bg-white/5 rounded-lg border border-gray-100 dark:border-white/5 hover:bg-primary/5 dark:hover:bg-white/10 transition-colors"
+                              className="flex justify-between items-center text-xs py-1.5 px-2.5 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/5 hover:bg-primary/5 dark:hover:bg-white/10 transition-colors"
                             >
-                              <span className="text-gray-700 dark:text-gray-300 font-semibold">
+                              <span className="text-gray-700 dark:text-gray-300 font-semibold truncate max-w-[180px]">
                                 {item.name}
                               </span>
-                              <span className="text-gray-900 dark:text-white font-extrabold font-tabular">
+                              <span className="text-gray-900 dark:text-white font-extrabold font-tabular shrink-0">
                                 {formatAmount(item.price, currency)}
                               </span>
                             </div>
@@ -773,6 +840,51 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
             )}
           </div>
 
+        </div>
+      )}
+
+      {/* Receipt Image Lightbox Modal */}
+      {previewImage && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div 
+            className="bg-white dark:bg-[#131b2e] rounded-2xl max-w-lg w-full p-4 space-y-3 border border-white/10 shadow-2xl relative animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-white/10">
+              <div className="flex items-center gap-2 text-violet-600 dark:text-violet-400 font-bold text-sm">
+                <Camera size={18} />
+                <span>Biriktirilgan chek rasmi</span>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setPreviewImage(null)}
+                className="w-8 h-8 rounded-full bg-gray-100 dark:bg-white/10 text-gray-500 hover:text-gray-800 dark:hover:text-white flex items-center justify-center font-bold text-sm transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="rounded-xl overflow-hidden max-h-[70vh] bg-black/5 flex items-center justify-center">
+              <img 
+                src={previewImage} 
+                alt="Chek rasmi to'liq" 
+                className="max-h-[68vh] w-auto object-contain rounded-lg"
+              />
+            </div>
+            
+            <div className="text-center pt-1">
+              <button
+                type="button"
+                onClick={() => setPreviewImage(null)}
+                className="px-5 py-2 bg-primary text-white font-bold text-xs rounded-xl hover:opacity-90 transition-opacity cursor-pointer"
+              >
+                Yopish
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

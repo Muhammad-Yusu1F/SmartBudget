@@ -68,7 +68,37 @@ export const AboutScreen: React.FC = () => {
           Dasturning asosiy imkoniyatlari
         </h4>
 
-        {/* Item 1 */}
+        {/* Item 1: AI Chek Skaneri */}
+        <div className="bg-white dark:bg-[#131b2e] border border-gray-100 dark:border-white/5 rounded-2xl p-4 flex gap-4 shadow-sm">
+          <div className="p-2.5 bg-violet-500/10 text-violet-500 rounded-xl shrink-0 h-10 w-10 flex items-center justify-center">
+            <Sparkles size={20} />
+          </div>
+          <div className="space-y-1">
+            <h5 className="text-sm font-bold text-gray-800 dark:text-white flex items-center gap-1.5">
+              <span>AI Chek Skaneri (Kamera & Galereya)</span>
+            </h5>
+            <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+              Xarid chekingizni real vaqtda kamerada rasmga oling yoki galereyadan tanlang. Sun'iy intelekt avtomatik ravishda chekdagi jami summa, do'kon nomi va toifani aniqlab beradi.
+            </p>
+          </div>
+        </div>
+
+        {/* Item 2: Pul Kiritish va Balans */}
+        <div className="bg-white dark:bg-[#131b2e] border border-gray-100 dark:border-white/5 rounded-2xl p-4 flex gap-4 shadow-sm">
+          <div className="p-2.5 bg-emerald-500/10 text-emerald-500 rounded-xl shrink-0 h-10 w-10 flex items-center justify-center">
+            <Wallet size={20} />
+          </div>
+          <div className="space-y-1">
+            <h5 className="text-sm font-bold text-gray-800 dark:text-white">
+              Boshlang'ich Pul Kiritish va Avto Ayirish
+            </h5>
+            <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+              Karta yoki hamyoningizdagi umumiy pulni kiritib qo'ying (masalan, 100.000 UZS). Chek skanerlanganda yoki xarajat kiritilganda ushbu summadan avtomatik ayirilib (masalan, 90.000 UZS qolib) aniq hisoblanadi.
+            </p>
+          </div>
+        </div>
+
+        {/* Item 3 */}
         <div className="bg-white dark:bg-[#131b2e] border border-gray-100 dark:border-white/5 rounded-2xl p-4 flex gap-4 shadow-sm">
           <div className="p-2.5 bg-amber-500/10 text-amber-500 rounded-xl shrink-0 h-10 w-10 flex items-center justify-center">
             <TrendingUp size={20} />

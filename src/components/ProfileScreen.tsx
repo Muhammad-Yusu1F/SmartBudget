@@ -285,7 +285,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
   const [pendingImportData, setPendingImportData] = useState<any | null>(null);
 
-  const handleExport = () => {
+  const handleExport = async () => {
     let parsedTxs: Transaction[] = [];
     try {
       parsedTxs = JSON.parse(transactionsJson);
@@ -303,7 +303,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       phoneNumber: phoneDigits.trim() ? `+998${phoneDigits.replace(/\s/g, '')}` : profile.phoneNumber
     };
 
-    exportPDFReport(parsedTxs, currentProfile, baseBalance);
+    onShowWebToast?.("📄 PDF hisoboti shakllantirilmoqda...");
+    await exportPDFReport(parsedTxs, currentProfile, baseBalance);
+    onShowWebToast?.("✅ PDF hisoboti tayyor bo'ldi!");
   };
 
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {

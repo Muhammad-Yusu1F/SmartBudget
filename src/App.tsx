@@ -289,7 +289,7 @@ export default function App() {
 
   const currentPeriodBalance = dashboardPeriod === 'barchasi' 
     ? currentBalance 
-    : (totalIncome - totalExpense);
+    : (baseBalance + totalIncome - totalExpense);
 
   // Let's compute a dynamic comparison metric
   const percentageChange = filteredTxsForPeriod.length === 0 ? 0 : 12.5;
@@ -533,10 +533,16 @@ export default function App() {
 
             {/* Balance Card */}
             <BalanceCard 
-              balance={currentPeriodBalance} 
+              balance={currentBalance} 
               currency={profile.currency} 
               percentageChange={percentageChange}
-              periodLabel={dashboardPeriod === 'bugun' ? '24 Soat / Bugun' : dashboardPeriod === 'hafta' ? 'Shu Hafta' : 'Umumiy'}
+              periodLabel="Jami Mavjud Balans"
+              baseBalance={baseBalance}
+              onUpdateBaseBalance={(newVal) => {
+                setBaseBalance(newVal);
+                saveBaseBalance(newVal, authUser?.uid);
+                setWebToastMessage("Boshlang'ich pul miqdori yangilandi!");
+              }}
             />
             
             {/* Period Selector Tabs */}
@@ -733,76 +739,76 @@ export default function App() {
       )}
 
       {/* Bottom Nav Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 w-full z-40 flex justify-around items-center px-2 pb-4 pt-2 bg-white/90 dark:bg-[#131b2e]/90 backdrop-blur-md border-t border-gray-100 dark:border-white/5 shadow-[0_-4px_12px_rgba(0,0,0,0.03)] rounded-t-2xl max-w-2xl mx-auto">
+      <nav className="fixed bottom-0 left-0 right-0 w-full z-40 flex justify-around items-center px-1.5 pb-3.5 pt-2 bg-white/95 dark:bg-[#131b2e]/95 backdrop-blur-md border-t border-gray-100 dark:border-white/5 shadow-[0_-4px_12px_rgba(0,0,0,0.03)] rounded-t-2xl max-w-2xl mx-auto">
         
-        {/* Tab 1: Home */}
+        {/* Tab 1: Asosiy */}
         <button 
           onClick={() => setActiveTab('home')}
-          className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-full transition-all duration-200 cursor-pointer active:scale-90 ${
+          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all duration-200 cursor-pointer active:scale-90 min-w-0 ${
             activeTab === 'home'
               ? 'bg-primary/10 dark:bg-primary-container text-primary dark:text-white'
               : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300'
           }`}
           id="nav-home-tab"
         >
-          <Grid2X2 size={20} />
-          <span className="text-[10px] font-bold mt-0.5">Home</span>
+          <Grid2X2 size={19} />
+          <span className="text-[10px] font-bold mt-0.5 whitespace-nowrap">Asosiy</span>
         </button>
 
-        {/* Tab 2: History */}
+        {/* Tab 2: Tarix */}
         <button 
           onClick={() => setActiveTab('history')}
-          className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-full transition-all duration-200 cursor-pointer active:scale-90 ${
+          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all duration-200 cursor-pointer active:scale-90 min-w-0 ${
             activeTab === 'history'
               ? 'bg-primary/10 dark:bg-primary-container text-primary dark:text-white'
               : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300'
           }`}
           id="nav-history-tab"
         >
-          <ReceiptText size={20} />
-          <span className="text-[10px] font-bold mt-0.5">History</span>
+          <ReceiptText size={19} />
+          <span className="text-[10px] font-bold mt-0.5 whitespace-nowrap">Tarix</span>
         </button>
 
-        {/* Tab 3: Insights */}
+        {/* Tab 3: Tahlil */}
         <button 
           onClick={() => setActiveTab('insights')}
-          className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-full transition-all duration-200 cursor-pointer active:scale-90 ${
+          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all duration-200 cursor-pointer active:scale-90 min-w-0 ${
             activeTab === 'insights'
               ? 'bg-primary/10 dark:bg-primary-container text-primary dark:text-white'
               : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300'
           }`}
           id="nav-insights-tab"
         >
-          <BarChart3 size={20} />
-          <span className="text-[10px] font-bold mt-0.5">Insights</span>
+          <BarChart3 size={19} />
+          <span className="text-[10px] font-bold mt-0.5 whitespace-nowrap">Tahlil</span>
         </button>
 
-        {/* Tab 4: Profile */}
+        {/* Tab 4: Profil */}
         <button 
           onClick={() => setActiveTab('profile')}
-          className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-full transition-all duration-200 cursor-pointer active:scale-90 ${
+          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all duration-200 cursor-pointer active:scale-90 min-w-0 ${
             activeTab === 'profile'
               ? 'bg-primary/10 dark:bg-primary-container text-primary dark:text-white'
               : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300'
           }`}
           id="nav-profile-tab"
         >
-          <User size={20} />
-          <span className="text-[10px] font-bold mt-0.5">Profile</span>
+          <User size={19} />
+          <span className="text-[10px] font-bold mt-0.5 whitespace-nowrap">Profil</span>
         </button>
 
-        {/* Tab 5: About */}
+        {/* Tab 5: Ilova / Haqida */}
         <button 
           onClick={() => setActiveTab('about')}
-          className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-full transition-all duration-200 cursor-pointer active:scale-90 ${
+          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all duration-200 cursor-pointer active:scale-90 min-w-0 ${
             activeTab === 'about'
               ? 'bg-primary/10 dark:bg-primary-container text-primary dark:text-white'
               : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300'
           }`}
           id="nav-about-tab"
         >
-          <Info size={20} />
-          <span className="text-[10px] font-bold mt-0.5">Haqida</span>
+          <Info size={19} />
+          <span className="text-[10px] font-bold mt-0.5 whitespace-nowrap">Ilova</span>
         </button>
 
       </nav>

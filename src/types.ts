@@ -15,6 +15,7 @@ export interface Transaction {
   time: string; // HH:MM
   description?: string;
   items?: { id: string; name: string; price: number }[];
+  receiptImage?: string; // base64 data URL for attached receipt photo
 }
 
 export interface Category {

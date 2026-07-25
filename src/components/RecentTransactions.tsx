@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { Transaction } from '../types';
 import { CategoryIcon, getCategoryStyles } from './CategoryIcon';
-import { ChevronDown, ChevronUp, ShoppingBag, PlusCircle, Lock } from 'lucide-react';
+import { ChevronDown, ChevronUp, ShoppingBag, PlusCircle, Lock, Camera, Pencil } from 'lucide-react';
 import { formatAmount, formatSignedAmount, isTransactionLocked } from '../lib/format';
 
 interface RecentTransactionsProps {
@@ -28,22 +28,22 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({
   // Show last 6 transactions on the dashboard to give more visibility
   const displayTxs = transactions.slice(0, 6);
 
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+
   const formatTxDate = (dateStr: string, timeStr: string) => {
     const today = new Date().toISOString().split('T')[0];
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     
-    let dayLabel = '';
+    const [year, month, day] = dateStr.split('-');
+    const formattedFullDate = `${day}.${month}.${year}`;
+
     if (dateStr === today) {
-      dayLabel = 'Bugun';
+      return `Bugun, ${timeStr}`;
     } else if (dateStr === yesterday) {
-      dayLabel = 'Kecha';
-    } else {
-      // Format as DD.MM.YYYY
-      const [year, month, day] = dateStr.split('-');
-      dayLabel = `${day}.${month}.${year}`;
+      return `Kecha, ${timeStr}`;
     }
     
-    return `${dayLabel}, ${timeStr}`;
+    return `${formattedFullDate}, ${timeStr}`;
   };
 
   const toggleExpand = (e: React.MouseEvent, id: string) => {
@@ -78,39 +78,62 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({
             return (
               <div 
                 key={tx.id}
-                onClick={() => onTransactionClick?.(tx)}
-                className="bg-[#ffffff] dark:bg-white/5 p-4 rounded-2xl border border-gray-100 dark:border-white/5 hover:border-primary/30 dark:hover:border-primary-fixed-dim/30 transition-all cursor-pointer group active:scale-[0.99] space-y-3 shadow-sm hover:shadow-md"
-                title="Tahrirlash uchun bosing"
+                onClick={(e) => {
+                  if (hasItems || tx.receiptImage) {
+                    toggleExpand(e, tx.id);
+                  }
+                }}
+                className="bg-white dark:bg-white/5 p-3.5 sm:p-4 rounded-2xl border border-gray-100 dark:border-white/5 hover:border-primary/30 dark:hover:border-primary-fixed-dim/30 transition-all cursor-pointer group active:scale-[0.99] shadow-xs hover:shadow-md"
+                title={hasItems || tx.receiptImage ? "Tafsilotlarni ko'rish uchun bosing" : "Tahlil"}
               >
-                {/* Core Transaction Row */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    {/* Category circular background */}
-                    <div className={`w-12 h-12 rounded-full ${styles.bg} ${styles.text} flex items-center justify-center transition-transform group-hover:scale-105 duration-200`}>
-                      <CategoryIcon category={tx.category} size={22} />
+                {/* Core Uniform Transaction Row */}
+                <div className="flex items-center justify-between gap-3 min-h-[48px]">
+                  {/* Left: Category Icon & Main Info */}
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    {/* Category circular icon background */}
+                    <div className={`w-11 h-11 rounded-2xl ${styles.bg} ${styles.text} flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 duration-200 shadow-xs`}>
+                      <CategoryIcon category={tx.category} size={20} />
                     </div>
-                    <div>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <p className="font-semibold text-sm text-gray-800 dark:text-gray-200 group-hover:text-primary dark:group-hover:text-primary-fixed-dim transition-colors">
-                          {tx.title}
-                        </p>
-                        
+
+                    <div className="min-w-0 flex-1 space-y-0.5">
+                      {/* Line 1: Title */}
+                      <p className="font-bold text-sm text-gray-900 dark:text-gray-100 group-hover:text-primary dark:group-hover:text-primary-fixed-dim transition-colors truncate">
+                        {tx.title}
+                      </p>
+
+                      {/* Line 2: Date + Compact Inline Badges */}
+                      <div className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500 font-medium truncate">
+                        <span className="shrink-0">{formatTxDate(tx.date, tx.time)}</span>
+
                         {/* Display itemized indicator badge */}
                         {hasItems && (
-                          <span 
+                          <button
+                            type="button"
                             onClick={(e) => toggleExpand(e, tx.id)}
-                            className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary/10 hover:bg-primary/25 text-primary dark:text-primary-fixed-dim px-2 py-0.5 rounded-full border border-primary/10 transition-colors"
+                            className="inline-flex items-center gap-0.5 text-[10px] font-extrabold bg-primary/10 hover:bg-primary/20 text-primary dark:text-primary-fixed-dim px-1.5 py-0.5 rounded-full border border-primary/10 transition-colors shrink-0 cursor-pointer"
+                            title={`${tx.items?.length} ta mahsulot xaridi`}
                           >
-                            <ShoppingBag size={10} />
-                            <span>{tx.items?.length} mahsulot</span>
+                            <ShoppingBag size={11} />
                             {isExpanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
-                          </span>
+                          </button>
                         )}
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">
-                          {formatTxDate(tx.date, tx.time)}
-                        </p>
+
+                        {/* Display attached receipt badge - clicking views image */}
+                        {tx.receiptImage && (
+                          <button 
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPreviewImage(tx.receiptImage || null);
+                            }}
+                            className="inline-flex items-center justify-center p-1 rounded-full bg-violet-100 hover:bg-violet-200 dark:bg-violet-950/60 dark:hover:bg-violet-900/80 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800/40 shrink-0 cursor-pointer transition-colors"
+                            title="Biriktirilgan chek rasmini ko'rish"
+                          >
+                            <Camera size={11} />
+                          </button>
+                        )}
+
+                        {/* Locked indicator */}
                         {isTransactionLocked(tx) && (
                           <span className="inline-flex items-center justify-center p-0.5 rounded bg-amber-100/80 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 shrink-0" title="Muhrlangan (24 soat o'tgan)">
                             <Lock size={10} />
@@ -119,53 +142,111 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({
                       </div>
                     </div>
                   </div>
-                  
-                  <div className="flex items-center gap-2 shrink-0 ml-2">
-                    <p className={`font-bold text-sm tracking-tight font-tabular whitespace-nowrap shrink-0 ${
+
+                  {/* Right: Amount & Category/Expand chevron & Edit button */}
+                  <div className="flex flex-col items-end shrink-0 pl-2 text-right">
+                    <p className={`font-extrabold text-sm sm:text-base tracking-tight font-tabular whitespace-nowrap ${
                       isExpense 
                         ? 'text-rose-600 dark:text-rose-400' 
                         : 'text-emerald-600 dark:text-emerald-400'
                     }`}>
                       {formatSignedAmount(tx.amount, tx.type, currency)}
                     </p>
-                    {hasItems && (
+
+                    <div className="flex items-center gap-1.5 mt-0.5">
                       <button
-                        onClick={(e) => toggleExpand(e, tx.id)}
-                        className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors cursor-pointer"
-                        title="Mahsulotlarni ko'rish"
+                        type="button"
+                        onClick={(e) => {
+                          if (hasItems || tx.receiptImage) {
+                            toggleExpand(e, tx.id);
+                          }
+                        }}
+                        className={`flex items-center gap-1 group/cat rounded px-1 transition-colors ${
+                          (hasItems || tx.receiptImage) ? 'hover:bg-gray-100 dark:hover:bg-white/10 cursor-pointer' : ''
+                        }`}
+                        title={hasItems || tx.receiptImage ? "Tafsilotlar va narsalar ro'yxatini ko'rish" : tx.category}
                       >
-                        {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 group-hover/cat:text-primary dark:group-hover/cat:text-primary-fixed-dim">
+                          {tx.category}
+                        </span>
+                        {(hasItems || tx.receiptImage) && (
+                          <span className="text-gray-400 group-hover/cat:text-primary dark:group-hover/cat:text-primary-fixed-dim transition-colors">
+                            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                          </span>
+                        )}
                       </button>
-                    )}
+
+                      {/* Explicit Edit Pencil Icon Button */}
+                      {onTransactionClick && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onTransactionClick(tx);
+                          }}
+                          className="p-1 rounded-lg text-gray-400 hover:text-primary hover:bg-gray-100 dark:hover:bg-white/10 transition-colors shrink-0 cursor-pointer"
+                          title="Tahrirlash modalini ochish"
+                        >
+                          <Pencil size={12} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                {/* PLUS FEATURE: Expandable list of spent items */}
-                {hasItems && isExpanded && (
+                {/* PLUS FEATURE: Expandable list of spent items and receipt photo */}
+                {(hasItems || tx.receiptImage) && isExpanded && (
                   <div 
-                    className="pt-3 border-t border-gray-100 dark:border-white/5 space-y-2 animate-in slide-in-from-top-2 duration-200"
+                    className="mt-3 pt-3 border-t border-gray-100 dark:border-white/5 space-y-3 animate-in slide-in-from-top-2 duration-200"
                     onClick={(e) => e.stopPropagation()} // Keep click on this area local to not open edit modal
                   >
-                    <div className="flex items-center gap-1 text-[10px] font-bold uppercase text-gray-400 dark:text-gray-500 tracking-wider">
-                      <ShoppingBag size={10} />
-                      <span>Xarajat tafsilotlari (Nimalarga ishlatilgan)</span>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 gap-1.5 pl-2">
-                      {tx.items?.map((item, idx) => (
-                        <div 
-                          key={item.id || idx} 
-                          className="flex justify-between items-center text-xs py-1.5 px-2.5 bg-gray-50 dark:bg-white/5 rounded-lg border border-gray-100 dark:border-white/5 hover:bg-primary/5 dark:hover:bg-white/10 transition-colors"
-                        >
-                          <span className="text-gray-700 dark:text-gray-300 font-semibold">
-                            {item.name}
-                          </span>
-                          <span className="text-gray-900 dark:text-white font-extrabold font-tabular">
-                            {formatAmount(item.price, currency)}
-                          </span>
+                    {hasItems && (
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-1 text-[10px] font-bold uppercase text-gray-400 dark:text-gray-500 tracking-wider">
+                          <ShoppingBag size={10} />
+                          <span>Xarajat tafsilotlari (Nimalarga ishlatilgan)</span>
                         </div>
-                      ))}
-                    </div>
+                        
+                        <div className="grid grid-cols-1 gap-1.5 pl-1">
+                          {tx.items?.map((item, idx) => (
+                            <div 
+                              key={item.id || idx} 
+                              className="flex justify-between items-center text-xs py-1.5 px-2.5 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/5 hover:bg-primary/5 dark:hover:bg-white/10 transition-colors"
+                            >
+                              <span className="text-gray-700 dark:text-gray-300 font-semibold truncate max-w-[180px]">
+                                {item.name}
+                              </span>
+                              <span className="text-gray-900 dark:text-white font-extrabold font-tabular shrink-0">
+                                {formatAmount(item.price, currency)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {tx.receiptImage && (
+                      <div className="space-y-1.5 pt-1">
+                        <div className="flex items-center gap-1 text-[10px] font-bold uppercase text-violet-600 dark:text-violet-400 tracking-wider">
+                          <Camera size={10} />
+                          <span>Skaner qilingan chek rasmi</span>
+                        </div>
+                        <div 
+                          onClick={() => setPreviewImage(tx.receiptImage || null)}
+                          className="relative group/img max-w-[200px] rounded-xl overflow-hidden border border-violet-200 dark:border-violet-800/40 cursor-pointer shadow-xs hover:shadow-md transition-all"
+                        >
+                          <img 
+                            src={tx.receiptImage} 
+                            alt="Chek rasmi" 
+                            className="w-full h-24 object-cover group-hover/img:scale-105 transition-transform duration-200" 
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1">
+                            <Camera size={14} />
+                            <span>Kattalashtirish</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -185,6 +266,51 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({
           </span>
         </div>
       </div>
+
+      {/* Receipt Image Modal Preview */}
+      {previewImage && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div 
+            className="bg-white dark:bg-[#131b2e] rounded-2xl max-w-lg w-full p-4 space-y-3 border border-white/10 shadow-2xl relative animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-white/10">
+              <div className="flex items-center gap-2 text-violet-600 dark:text-violet-400 font-bold text-sm">
+                <Camera size={18} />
+                <span>Biriktirilgan chek rasmi</span>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setPreviewImage(null)}
+                className="w-8 h-8 rounded-full bg-gray-100 dark:bg-white/10 text-gray-500 hover:text-gray-800 dark:hover:text-white flex items-center justify-center font-bold text-sm transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="rounded-xl overflow-hidden max-h-[70vh] bg-black/5 flex items-center justify-center">
+              <img 
+                src={previewImage} 
+                alt="Chek rasmi to'liq" 
+                className="max-h-[68vh] w-auto object-contain rounded-lg"
+              />
+            </div>
+            
+            <div className="text-center pt-1">
+              <button
+                type="button"
+                onClick={() => setPreviewImage(null)}
+                className="px-5 py-2 bg-primary text-white font-bold text-xs rounded-xl hover:opacity-90 transition-opacity cursor-pointer"
+              >
+                Yopish
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 };

@@ -8,6 +8,7 @@ import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 import fs from 'fs';
+import { GoogleGenAI } from '@google/genai';
 
 dotenv.config();
 
@@ -15,7 +16,24 @@ const app = express();
 
 // Security Hardening Config
 app.disable('x-powered-by');
-app.use(express.json({ limit: '50kb' })); // Mitigate Large Payload DoS Attacks
+app.use(express.json({ limit: '50mb' })); // Allow receipt base64 images
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Gemini Client Helper
+const getGeminiClient = () => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY sozlanmagan. Ilova sozlamalarida kalit kiriting.');
+  }
+  return new GoogleGenAI({
+    apiKey,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
+      },
+    },
+  });
+};
 
 // Security Headers Middleware (OWASP Standard Protection)
 app.use((req, res, next) => {
@@ -187,6 +205,129 @@ app.post('/api/admin/verify', (req, res) => {
   }
 
   return res.status(401).json({ success: false, error: 'Admin paroli noto‘g‘ri!' });
+});
+
+// AI Receipt Scanner API (Gemini Vision)
+app.post('/api/scan-receipt', async (req, res) => {
+  try {
+    const { imageBase64 } = req.body;
+    if (!imageBase64 || typeof imageBase64 !== 'string') {
+      return res.status(400).json({ success: false, error: "Chek rasmi yuborilmadi." });
+    }
+
+    let mimeType = 'image/jpeg';
+    let cleanBase64 = imageBase64;
+
+    if (imageBase64.includes(';base64,')) {
+      const parts = imageBase64.split(';base64,');
+      cleanBase64 = parts[1];
+      const mimeMatch = parts[0].match(/data:(.*?);/);
+      if (mimeMatch) {
+        mimeType = mimeMatch[1];
+      }
+    }
+
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(400).json({
+        success: false,
+        error: "GEMINI_API_KEY sozlanmagan. Sozlamalar menyusida API kalitni kiriting."
+      });
+    }
+
+    const ai = getGeminiClient();
+
+    const promptText = `Ushbu xarid cheki yoki kvitansiya rasmini sinchiklab o'rganing va ma'lumotlarni quyidagi JSON formatda taqdim eting:
+{
+  "title": "Do'kon, xizmat ko'rsatuvchi yoki kassa nomi (masalan: Korzinka, Makro, Yandex Go, Zapravka, Restoran, Apteka)",
+  "amount": xaridning umumiy jami summasi (faqat son ko'rinishida, masalan: 125000),
+  "type": "chiqim",
+  "category": "Kategoriyani eng mos keladiganiga tanlang: 'Oziq-ovqat', 'Ijara va Uy', 'Transport', 'Kafe va Restoran', 'Kommunal to\\'lovlar', 'Kiyim-kechak', 'Sog\\'liq', 'Ta\\'lim va Kitoblar', 'Telefon va Internet', 'Ko\\'ngilochar', 'Kredit va Qarz', 'Boshqa'",
+  "date": "YYYY-MM-DD formatdagi sana (chekda yo'q bo'lsa bugungi sana)",
+  "time": "HH:MM formatdagi vaqt (chekda yo'q bo'lsa hozirgi vaqt)",
+  "description": "Chekdagi asosiy xaridlar va qisqa izoh",
+  "items": [
+    { "id": "1", "name": "Mahsulot nomi", "price": mahsulot narxi }
+  ]
+}
+JAVOB FAQT TOZA JSON BO'LSIN, HECH QANDAY SHARH VA MARKDOWN BLOKSIZ.`;
+
+    const candidateModels = ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.1-pro-preview'];
+    let responseText = '';
+    let lastError: any = null;
+
+    for (const modelName of candidateModels) {
+      try {
+        const response = await ai.models.generateContent({
+          model: modelName,
+          contents: {
+            parts: [
+              {
+                inlineData: {
+                  mimeType,
+                  data: cleanBase64,
+                },
+              },
+              {
+                text: promptText,
+              },
+            ],
+          },
+          config: {
+            responseMimeType: 'application/json',
+          },
+        });
+        if (response && response.text) {
+          responseText = response.text;
+          break;
+        }
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`Model ${modelName} scan failed, trying next fallback...`, err?.message || err);
+      }
+    }
+
+    if (!responseText) {
+      const detail = lastError?.message || lastError || "AI orqali chekni o'qib bo'lmadi.";
+      throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+    }
+
+    let parsedData = null;
+    try {
+      parsedData = JSON.parse(responseText);
+    } catch {
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          parsedData = JSON.parse(jsonMatch[0]);
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    if (!parsedData) {
+      return res.status(500).json({ success: false, error: "Chek ma'lumotlarini o'qib bo'lmadi." });
+    }
+
+    return res.json({ success: true, data: parsedData });
+  } catch (err: any) {
+    console.error("Receipt Scan API error:", err);
+    let errorMsg = err?.message || "Chekni skanerlashda xatolik yuz berdi.";
+    if (typeof errorMsg === 'string' && errorMsg.includes('{') && errorMsg.includes('error')) {
+      try {
+        const parsed = JSON.parse(errorMsg);
+        if (parsed?.error?.message) {
+          errorMsg = parsed.error.message;
+        }
+      } catch {
+        // retain string
+      }
+    }
+    return res.status(500).json({
+      success: false,
+      error: errorMsg
+    });
+  }
 });
 
 // 1. Get real tracked downloads and count (Protected)

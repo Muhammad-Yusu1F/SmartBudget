@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { X, Trash2, Plus, Edit3, ShoppingBag, PlusCircle, Search, Lock } from 'lucide-react';
+import { X, Trash2, Plus, Edit3, ShoppingBag, PlusCircle, Search, Lock, Camera, Sparkles, Loader2, Maximize2, CheckCircle2, Image as ImageIcon } from 'lucide-react';
 import { Transaction, TransactionType } from '../types';
 import { formatAmount, isTransactionLocked } from '../lib/format';
 import { CategoryIcon, getCategoryStyles } from './CategoryIcon';
@@ -34,6 +34,53 @@ const CATEGORIES = [
   'Boshqa'
 ];
 
+const detectCategoryFromAI = (aiCategory?: string, titleStr?: string, itemsArr?: any[]): string => {
+  const combinedText = [
+    aiCategory || '',
+    titleStr || '',
+    ...(itemsArr ? itemsArr.map(i => i.name || '') : [])
+  ].join(' ').toLowerCase();
+
+  if (aiCategory) {
+    const directMatch = CATEGORIES.find(c => 
+      c.toLowerCase() === aiCategory.toLowerCase() ||
+      aiCategory.toLowerCase().includes(c.toLowerCase()) ||
+      c.toLowerCase().includes(aiCategory.toLowerCase())
+    );
+    if (directMatch) return directMatch;
+  }
+
+  if (/cola|fanta|sprite|pepsi|non|sut|qatiq|go'sht|gosht|supermarket|korzinka|makro|havas|bi1|shakar|guruch|suv|choy|oziq|bozor|sabzavot|meva|pishiriq|osh|nonxona/i.test(combinedText)) {
+    return 'Oziq-ovqat';
+  }
+  if (/kafe|restoran|somsa|fastfood|lavash|burger|pizza|kofe|coffee|tushlik|kechki ovqat|shashlik/i.test(combinedText)) {
+    return 'Kafe va Restoran';
+  }
+  if (/yandex|taxi|taksi|benzin|metan|propan|zapravka|avto|bus|metro|transport|moy/i.test(combinedText)) {
+    return 'Transport';
+  }
+  if (/dorixona|apteka|dori|shifoxona|vrach|sog'liq|sogliq|klinika/i.test(combinedText)) {
+    return 'Sog\'liq';
+  }
+  if (/beeline|ucell|uzmobile|mobicool|mobiuz|internet|telefon|payme|click/i.test(combinedText)) {
+    return 'Telefon va Internet';
+  }
+  if (/tok|svet|gaz|suv|kommunal|musor|chiqindi/i.test(combinedText)) {
+    return 'Kommunal to\'lovlar';
+  }
+  if (/shim|ko'ylak|koylak|poyabzal|oyoq kiyim|kiyim|bozor|zara/i.test(combinedText)) {
+    return 'Kiyim-kechak';
+  }
+  if (/kitob|daftar|maktab|kurs|ta'lim|talim|universitet/i.test(combinedText)) {
+    return 'Ta\'lim va Kitoblar';
+  }
+  if (/kino|teatr|park|o'yin|oyuk|cinema/i.test(combinedText)) {
+    return 'Ko\'ngilochar';
+  }
+
+  return 'Oziq-ovqat';
+};
+
 export const TransactionModal: React.FC<TransactionModalProps> = ({
   isOpen,
   onClose,
@@ -51,6 +98,131 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   const [time, setTime] = useState('');
   const [description, setDescription] = useState('');
   const [error, setError] = useState('');
+
+  // AI Receipt Scanner & Mode State
+  const [inputMode, setInputMode] = useState<'ai' | 'manual'>('ai');
+  const [receiptImage, setReceiptImage] = useState<string | undefined>(undefined);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanSuccessMsg, setScanSuccessMsg] = useState<string | null>(null);
+  const [previewFullImage, setPreviewFullImage] = useState(false);
+
+  // Client-side lightweight image compression for AI scanning & storage
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 800;
+          const MAX_HEIGHT = 800;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+          resolve(dataUrl);
+        };
+        img.onerror = (err) => reject(err);
+      };
+      reader.onerror = (err) => reject(err);
+    });
+  };
+
+  // Handle receipt photo scanning via Gemini API
+  const handleReceiptFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsScanning(true);
+    setError('');
+    setScanSuccessMsg(null);
+
+    try {
+      const compressedBase64 = await compressImage(file);
+      setReceiptImage(compressedBase64);
+
+      let response;
+      try {
+        response = await fetch('/api/scan-receipt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageBase64: compressedBase64 }),
+        });
+      } catch (netErr) {
+        throw new Error("Serverga ulanib bo'lmadi. Internet aloqasini tekshiring.");
+      }
+
+      let resData;
+      try {
+        resData = await response.json();
+      } catch {
+        throw new Error("Server noto'g'ri javob qaytardi.");
+      }
+
+      if (!response.ok || !resData.success) {
+        throw new Error(resData.error || "Chekni skanerlashda xatolik yuz berdi.");
+      }
+
+      const data = resData.data;
+
+      if (data.title) setTitle(data.title);
+      if (data.amount && !isNaN(Number(data.amount))) {
+        setAmount(formatInput(data.amount.toString()));
+      }
+      if (data.type === 'kirim' || data.type === 'chiqim') {
+        setType(data.type);
+      }
+
+      // Intelligent category auto-detection (e.g. Cola/Non -> Oziq-ovqat, Taxi -> Transport)
+      const detectedCategory = detectCategoryFromAI(data.category, data.title, data.items);
+      setCategory(detectedCategory);
+
+      if (data.date && /^\d{4}-\d{2}-\d{2}$/.test(data.date)) {
+        setDate(data.date);
+      }
+      if (data.time && /^\d{2}:\d{2}$/.test(data.time)) {
+        setTime(data.time);
+      }
+      if (data.description) {
+        setDescription(data.description);
+      }
+      if (data.items && Array.isArray(data.items) && data.items.length > 0) {
+        const formattedItems = data.items.map((it: any, idx: number) => ({
+          id: `scanned-${idx}-${Date.now()}`,
+          name: String(it.name || 'Mahsulot'),
+          price: Number(it.price) || 0,
+        }));
+        setItems(formattedItems);
+        setShowItemsEditor(true);
+      }
+
+      setScanSuccessMsg("✨ AI Chek muvaffaqiyatli tahlil qilindi va ma'lumotlar to'ldirildi!");
+    } catch (err: any) {
+      console.error("Scan receipt error:", err);
+      setError(err?.message || "Chekni AI tahlil qilishda xatolik. Rasmni saqlab, ma'lumotlarni qo'lda kiritishingiz mumkin.");
+    } finally {
+      setIsScanning(false);
+      if (e.target) e.target.value = '';
+    }
+  };
 
   // Helper to format raw input into dotted format for UZS or normal number
   const formatInput = (val: string): string => {
@@ -81,7 +253,11 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   useEffect(() => {
     setCategorySearch('');
     setShowDeleteConfirm(false);
+    setScanSuccessMsg(null);
+    setPreviewFullImage(false);
+
     if (editingTransaction) {
+      setInputMode('manual');
       setTitle(editingTransaction.title);
       setAmount(formatInput(editingTransaction.amount.toString()));
       setType(editingTransaction.type);
@@ -95,6 +271,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       setDate(editingTransaction.date);
       setTime(editingTransaction.time);
       setDescription(editingTransaction.description || '');
+      setReceiptImage(editingTransaction.receiptImage);
       
       if (editingTransaction.items && editingTransaction.items.length > 0) {
         setItems(editingTransaction.items);
@@ -117,6 +294,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       setTime(`${HH}:${MM}`);
       
       setDescription('');
+      setReceiptImage(undefined);
       setItems([]);
       setShowItemsEditor(false);
     }
@@ -214,7 +392,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       date,
       time,
       description: description.trim() || undefined,
-      items: showItemsEditor && items.length > 0 ? items : undefined
+      items: showItemsEditor && items.length > 0 ? items : undefined,
+      receiptImage: receiptImage || undefined,
     });
     
     onClose();
@@ -271,6 +450,37 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             </div>
           )}
 
+          {/* 2-Mode Selector Tabs (AI Kamera / Qo'lda kiritish) */}
+          {!isLocked && (
+            <div className="grid grid-cols-2 p-1 bg-gray-100 dark:bg-white/5 rounded-2xl border border-gray-200/60 dark:border-white/10 mb-3">
+              <button
+                type="button"
+                onClick={() => setInputMode('ai')}
+                className={`py-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  inputMode === 'ai'
+                    ? 'bg-violet-600 text-white shadow-md scale-[1.02]'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                <Camera size={16} className={inputMode === 'ai' ? 'animate-pulse' : ''} />
+                <span>AI Chek Skaner</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setInputMode('manual')}
+                className={`py-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  inputMode === 'manual'
+                    ? 'bg-primary dark:bg-primary-fixed text-white dark:text-gray-900 shadow-md scale-[1.02]'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                <Edit3 size={16} />
+                <span>Qo'lda kiritish</span>
+              </button>
+            </div>
+          )}
+
           {/* Error Message */}
           {error && (
             <div className="bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 p-3 rounded-xl text-xs font-semibold border border-rose-100 dark:border-rose-950">
@@ -278,50 +488,226 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             </div>
           )}
 
-          {/* Type Toggle: Kirim / Chiqim */}
-          <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 dark:bg-white/5 rounded-xl border border-gray-200/50 dark:border-white/5">
-            <button
-              type="button"
-              disabled={isLocked}
-              onClick={() => handleTypeChange('chiqim')}
-              className={`py-2 px-4 rounded-lg text-xs font-bold transition-all ${isLocked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'} ${
-                type === 'chiqim'
-                  ? 'bg-rose-600 text-white shadow-md'
-                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white'
-              }`}
-            >
-              Chiqim (Expense)
-            </button>
-            <button
-              type="button"
-              disabled={isLocked}
-              onClick={() => handleTypeChange('kirim')}
-              className={`py-2 px-4 rounded-lg text-xs font-bold transition-all ${isLocked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'} ${
-                type === 'kirim'
-                  ? 'bg-emerald-600 text-white shadow-md'
-                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white'
-              }`}
-            >
-              Kirim (Income)
-            </button>
-          </div>
+          {/* MODE 1: AI CAMERA SCANNER MODE */}
+          {!isLocked && inputMode === 'ai' && (
+            <div className="space-y-4 animate-in fade-in">
+              {/* Scan Success Alert */}
+              {scanSuccessMsg && (
+                <div className="bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 p-2.5 rounded-xl text-xs font-bold flex items-center justify-between border border-emerald-200 dark:border-emerald-900/40">
+                  <span className="text-[11px]">{scanSuccessMsg}</span>
+                  <button type="button" onClick={() => setScanSuccessMsg(null)} className="text-emerald-500 hover:text-emerald-700 p-0.5 cursor-pointer">
+                    <X size={12} />
+                  </button>
+                </div>
+              )}
 
-          {/* Title */}
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-              Amal sarlavhasi
-            </label>
-            <input
-              type="text"
-              disabled={isLocked}
-              placeholder="Masalan: Yandex Go, Tushlik, Supermarket"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className={`w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:border-primary dark:focus:border-primary-fixed-dim focus:ring-1 focus:ring-primary dark:focus:ring-primary-fixed-dim ${
-                isLocked ? 'opacity-70 cursor-not-allowed bg-gray-100 dark:bg-white/10' : ''
-              }`}
-            />
-          </div>
+              {/* State 1: Scanning Loader */}
+              {isScanning ? (
+                <div className="p-8 bg-violet-50/60 dark:bg-violet-950/30 rounded-2xl border border-violet-200 dark:border-violet-800/40 flex flex-col items-center justify-center text-center space-y-3">
+                  <div className="relative">
+                    <div className="w-12 h-12 rounded-full border-4 border-violet-200 border-t-violet-600 animate-spin" />
+                    <Sparkles className="absolute inset-0 m-auto text-violet-600 animate-pulse" size={18} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black text-violet-900 dark:text-violet-200">
+                      AI Chekni tahlil qilmoqda...
+                    </h4>
+                    <p className="text-xs text-violet-700/80 dark:text-violet-300/80 font-medium mt-1 max-w-xs">
+                      Sarlavha, jami summa va toifa sun'iy intellekt orqali o'qilmoqda
+                    </p>
+                  </div>
+                </div>
+              ) : receiptImage ? (
+                /* State 2: Scanned Result Card */
+                <div className="space-y-3 bg-gradient-to-br from-violet-50/60 via-indigo-50/40 to-slate-50 dark:from-violet-950/30 dark:to-slate-900/40 p-4 rounded-2xl border border-violet-200 dark:border-violet-800/40">
+                  <div className="flex items-center justify-between pb-2 border-b border-violet-200/60 dark:border-white/10">
+                    <span className="text-xs font-black text-violet-900 dark:text-violet-200 flex items-center gap-1.5">
+                      <CheckCircle2 size={16} className="text-emerald-500" />
+                      AI Natijalari Aniqladi
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <label className="text-[11px] font-bold text-violet-600 dark:text-violet-400 hover:underline cursor-pointer flex items-center gap-1">
+                        <Camera size={12} /> Kamera
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          onChange={handleReceiptFileChange}
+                          disabled={isScanning}
+                          className="hidden"
+                        />
+                      </label>
+                      <span className="text-gray-300 dark:text-gray-600">•</span>
+                      <label className="text-[11px] font-bold text-violet-600 dark:text-violet-400 hover:underline cursor-pointer flex items-center gap-1">
+                        <ImageIcon size={12} /> Galereya
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleReceiptFileChange}
+                          disabled={isScanning}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Scanned Card Info */}
+                  <div className="flex items-center gap-3 bg-white dark:bg-[#131b2e] p-3 rounded-xl border border-gray-100 dark:border-white/5">
+                    <img
+                      src={receiptImage}
+                      alt="Skanerlangan chek"
+                      className="w-16 h-16 object-cover rounded-xl border border-gray-200 dark:border-white/10 cursor-pointer shrink-0 hover:opacity-90 transition-opacity"
+                      onClick={() => setPreviewFullImage(true)}
+                    />
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <p className="text-sm font-black text-gray-900 dark:text-white truncate">
+                        {title || "Xarid cheki"}
+                      </p>
+                      <p className="text-base font-extrabold text-rose-600 dark:text-rose-400">
+                        -{amount || '0'} {currency}
+                      </p>
+                      <div className="flex items-center gap-2 text-[10px] text-gray-500 dark:text-gray-400 font-bold flex-wrap">
+                        <span className="bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 px-2 py-0.5 rounded-md">
+                          🏷️ {category}
+                        </span>
+                        <span>📅 {date} {time}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Items list if detected */}
+                  {items.length > 0 && (
+                    <div className="p-3 bg-white dark:bg-[#131b2e] rounded-xl border border-gray-100 dark:border-white/5 space-y-1">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                        Chekdagi mahsulotlar ({items.length} ta):
+                      </p>
+                      <div className="max-h-28 overflow-y-auto space-y-1">
+                        {items.map((it, idx) => (
+                          <div key={idx} className="flex justify-between text-[11px] text-gray-700 dark:text-gray-300 border-b border-gray-50 dark:border-white/5 last:border-0 py-0.5">
+                            <span className="truncate">{it.name}</span>
+                            <span className="font-bold shrink-0">{formatAmount(it.price, currency)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Submit Button in AI Mode */}
+                  <div className="pt-2 space-y-2">
+                    <button
+                      type="submit"
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg transition-all text-xs flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <CheckCircle2 size={16} />
+                      <span>Ushbu chekni saqlash (-{amount || '0'} {currency})</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setInputMode('manual')}
+                      className="w-full bg-white dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 text-gray-700 dark:text-gray-300 font-bold py-2.5 px-4 rounded-xl border border-gray-200 dark:border-white/10 transition-all text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Edit3 size={14} />
+                      <span>Tahrirlash / Qo'lda o'zgartirish</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* State 3: Initial Camera Scan Prompt */
+                <div className="border-2 border-dashed border-violet-300 dark:border-violet-700/60 bg-gradient-to-br from-violet-50/50 via-purple-50/30 to-indigo-50/50 dark:from-violet-950/20 dark:to-indigo-950/20 rounded-2xl p-6 flex flex-col items-center justify-center gap-3 text-center shadow-sm">
+                  <div className="p-4 rounded-2xl bg-violet-600 text-white shadow-lg">
+                    <Camera size={32} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-extrabold text-gray-900 dark:text-white flex items-center justify-center gap-1.5">
+                      Chek yoki Kvitansiyani Skanerlash
+                      <Sparkles size={14} className="text-violet-500 animate-pulse" />
+                    </h4>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mt-1 max-w-xs leading-relaxed">
+                      Real vaqtda rasmga oling yoki galereyadan chek rasmini tanlang. AI summa va tafsilotlarni avtomatik hisoblab beradi!
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 mt-2 w-full max-w-xs">
+                    {/* Option A: Real Live Camera */}
+                    <label className="flex-1 bg-violet-600 hover:bg-violet-700 active:scale-95 text-white text-xs font-bold py-2.5 px-3 rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center">
+                      <Camera size={15} />
+                      <span>Kamera</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={handleReceiptFileChange}
+                        disabled={isScanning}
+                        className="hidden"
+                      />
+                    </label>
+
+                    {/* Option B: Gallery File Picker */}
+                    <label className="flex-1 bg-white dark:bg-white/10 hover:bg-gray-100 dark:hover:bg-white/15 active:scale-95 text-gray-800 dark:text-white border border-gray-200 dark:border-white/10 text-xs font-bold py-2.5 px-3 rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center">
+                      <ImageIcon size={15} className="text-violet-500" />
+                      <span>Galereya</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleReceiptFileChange}
+                        disabled={isScanning}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* MODE 2: MANUAL INPUT FORM */}
+          {(isLocked || inputMode === 'manual') && (
+            <div className="space-y-4 animate-in fade-in">
+              {/* Type Toggle: Kirim / Chiqim */}
+              <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 dark:bg-white/5 rounded-xl border border-gray-200/50 dark:border-white/5">
+                <button
+                  type="button"
+                  disabled={isLocked}
+                  onClick={() => handleTypeChange('chiqim')}
+                  className={`py-2 px-4 rounded-lg text-xs font-bold transition-all ${isLocked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'} ${
+                    type === 'chiqim'
+                      ? 'bg-rose-600 text-white shadow-md'
+                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white'
+                  }`}
+                >
+                  Chiqim (Expense)
+                </button>
+                <button
+                  type="button"
+                  disabled={isLocked}
+                  onClick={() => handleTypeChange('kirim')}
+                  className={`py-2 px-4 rounded-lg text-xs font-bold transition-all ${isLocked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'} ${
+                    type === 'kirim'
+                      ? 'bg-emerald-600 text-white shadow-md'
+                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white'
+                  }`}
+                >
+                  Kirim (Income)
+                </button>
+              </div>
+
+              {/* Title */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
+                  Amal sarlavhasi
+                </label>
+                <input
+                  type="text"
+                  disabled={isLocked}
+                  placeholder="Masalan: Yandex Go, Tushlik, Supermarket"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className={`w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:border-primary dark:focus:border-primary-fixed-dim focus:ring-1 focus:ring-primary dark:focus:ring-primary-fixed-dim ${
+                    isLocked ? 'opacity-70 cursor-not-allowed bg-gray-100 dark:bg-white/10' : ''
+                  }`}
+                />
+              </div>
 
           {/* Amount */}
           <div>
@@ -641,8 +1027,34 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           )}
 
 
+          </div>
+          )}
+
         </form>
       </div>
+
+      {/* Full-Size Receipt Lightbox Modal */}
+      {previewFullImage && receiptImage && (
+        <div className="fixed inset-0 z-[60] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-4 animate-in fade-in">
+          <div className="relative max-w-2xl w-full max-h-[85vh] flex flex-col items-center justify-center">
+            <button
+              type="button"
+              onClick={() => setPreviewFullImage(false)}
+              className="absolute -top-12 right-0 text-white hover:text-gray-300 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors cursor-pointer"
+            >
+              <X size={20} />
+            </button>
+            <img
+              src={receiptImage}
+              alt="Chek to'liq rasmi"
+              className="max-w-full max-h-[80vh] object-contain rounded-2xl shadow-2xl border border-white/20"
+            />
+            <p className="text-white/80 text-xs mt-3 font-semibold text-center">
+              Biriktirilgan chek va kvitansiya rasmi
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
