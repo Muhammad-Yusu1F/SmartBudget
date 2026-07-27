@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { Sun, Moon, Wallet } from 'lucide-react';
+import { AccentTheme, ACCENT_THEMES } from '../types';
 
 interface HeaderProps {
   theme: 'light' | 'dark';
@@ -14,6 +15,7 @@ interface HeaderProps {
   userEmail?: string;
   onAdminClick?: () => void;
   onLogoClick?: () => void;
+  accentTheme?: AccentTheme;
 }
 
 export const Header: React.FC<HeaderProps> = ({ 
@@ -21,9 +23,14 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleTheme, 
   avatarUrl, 
   userName,
+  userEmail,
   onAdminClick,
-  onLogoClick
+  onLogoClick,
+  accentTheme = 'blue'
 }) => {
+  const isAdminUser = userEmail?.trim().toLowerCase() === 'muhayusuf105@gmail.com';
+  const currentAccent = ACCENT_THEMES[accentTheme] || ACCENT_THEMES.blue;
+
   return (
     <header className="fixed top-0 left-0 right-0 w-full z-50 bg-[#faf8ff] dark:bg-[#131b2e]/95 backdrop-blur-md shadow-sm border-b border-gray-100 dark:border-white/10 flex justify-between items-center px-5 h-16 transition-colors duration-200">
       {/* Left side: SmartBudget Logo and Name */}
@@ -32,14 +39,14 @@ export const Header: React.FC<HeaderProps> = ({
         className="flex items-center gap-2.5 cursor-pointer hover:opacity-90 active:scale-95 transition-all select-none"
         title="SmartBudget Bosh Sahifasi"
       >
-        <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#38bdf8] to-[#0284c7] dark:from-[#0ea5e9] dark:to-[#0369a1] flex items-center justify-center shadow-md shadow-sky-500/15 dark:shadow-sky-500/5 shrink-0">
+        <div className={`w-9 h-9 rounded-xl bg-gradient-to-tr ${currentAccent.headerIconGradient} flex items-center justify-center shadow-md shadow-sky-500/15 dark:shadow-sky-500/5 shrink-0 transition-all duration-300`}>
           <Wallet size={18} className="text-white" />
         </div>
         <div className="flex items-center gap-2">
           <h1 className="text-lg sm:text-xl font-extrabold tracking-tight text-gray-900 dark:text-white">
             SmartBudget
           </h1>
-          {onAdminClick && (
+          {onAdminClick && isAdminUser && (
             <button
               onClick={(e) => {
                 e.stopPropagation();

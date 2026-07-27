@@ -106,29 +106,26 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   const [scanSuccessMsg, setScanSuccessMsg] = useState<string | null>(null);
   const [previewFullImage, setPreviewFullImage] = useState(false);
 
-  // Client-side lightweight image compression for AI scanning & storage
+  // Mobile-optimized image processor & compressor for high-accuracy AI receipt OCR
   const compressImage = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target?.result as string;
-        img.onload = () => {
+      const renderToCanvas = (source: HTMLImageElement | ImageBitmap, origWidth: number, origHeight: number) => {
+        try {
           const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 800;
-          const MAX_HEIGHT = 800;
-          let width = img.width;
-          let height = img.height;
+          // High clarity max dimensions for mobile camera thermal receipts (1600 x 2400 max)
+          const MAX_WIDTH = 1600;
+          const MAX_HEIGHT = 2400;
+          let width = origWidth;
+          let height = origHeight;
 
           if (width > height) {
             if (width > MAX_WIDTH) {
-              height *= MAX_WIDTH / width;
+              height = Math.round(height * (MAX_WIDTH / width));
               width = MAX_WIDTH;
             }
           } else {
             if (height > MAX_HEIGHT) {
-              width *= MAX_HEIGHT / height;
+              width = Math.round(width * (MAX_HEIGHT / height));
               height = MAX_HEIGHT;
             }
           }
@@ -136,13 +133,42 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           canvas.width = width;
           canvas.height = height;
           const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, width, height);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+          if (ctx) {
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(source, 0, 0, width, height);
+          }
+          // JPEG quality 0.85 ensures crisp thermal printing contrast for OCR
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
           resolve(dataUrl);
-        };
-        img.onerror = (err) => reject(err);
+        } catch (err) {
+          reject(err);
+        }
       };
-      reader.onerror = (err) => reject(err);
+
+      if (typeof window !== 'undefined' && 'createImageBitmap' in window) {
+        createImageBitmap(file)
+          .then((bitmap) => {
+            renderToCanvas(bitmap, bitmap.width, bitmap.height);
+          })
+          .catch(() => {
+            fallbackRead();
+          });
+      } else {
+        fallbackRead();
+      }
+
+      function fallbackRead() {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+          const img = new Image();
+          img.src = event.target?.result as string;
+          img.onload = () => renderToCanvas(img, img.width, img.height);
+          img.onerror = (err) => reject(err);
+        };
+        reader.onerror = (err) => reject(err);
+      }
     });
   };
 
@@ -183,27 +209,65 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
       const data = resData.data;
 
-      if (data.title) setTitle(data.title);
-      if (data.amount && !isNaN(Number(data.amount))) {
-        setAmount(formatInput(data.amount.toString()));
+      // Intelligent title assignment
+      const detectedCategory = detectCategoryFromAI(data.category, data.title, data.items);
+      const finalTitle = (data.title && String(data.title).trim().length > 1) 
+        ? String(data.title).trim() 
+        : `${detectedCategory} xaridi`;
+      
+      setTitle(finalTitle);
+
+      // Clean extraction of amount for phone receipts
+      let rawAmount = 0;
+      if (typeof data.amount === 'number' && !isNaN(data.amount) && data.amount > 0) {
+        rawAmount = data.amount;
+      } else if (data.amount) {
+        const digitsOnly = String(data.amount).replace(/[^\d]/g, '');
+        if (digitsOnly) rawAmount = parseInt(digitsOnly, 10);
       }
+
+      // Fallback 1: If amount is still 0, calculate sum from items
+      if (rawAmount === 0 && data.items && Array.isArray(data.items) && data.items.length > 0) {
+        rawAmount = data.items.reduce((acc: number, it: any) => {
+          let p = 0;
+          if (typeof it.price === 'number' && !isNaN(it.price)) p = it.price;
+          else if (it.price) {
+            const pDigits = String(it.price).replace(/[^\d]/g, '');
+            if (pDigits) p = parseInt(pDigits, 10);
+          }
+          return acc + p;
+        }, 0);
+      }
+
+      if (rawAmount > 0) {
+        setAmount(formatInput(rawAmount.toString()));
+      }
+
       if (data.type === 'kirim' || data.type === 'chiqim') {
         setType(data.type);
       }
 
-      // Intelligent category auto-detection (e.g. Cola/Non -> Oziq-ovqat, Taxi -> Transport)
-      const detectedCategory = detectCategoryFromAI(data.category, data.title, data.items);
       setCategory(detectedCategory);
 
       if (data.date && /^\d{4}-\d{2}-\d{2}$/.test(data.date)) {
         setDate(data.date);
+      } else {
+        setDate(new Date().toISOString().split('T')[0]);
       }
+
       if (data.time && /^\d{2}:\d{2}$/.test(data.time)) {
         setTime(data.time);
+      } else {
+        const now = new Date();
+        const HH = String(now.getHours()).padStart(2, '0');
+        const MM = String(now.getMinutes()).padStart(2, '0');
+        setTime(`${HH}:${MM}`);
       }
+
       if (data.description) {
         setDescription(data.description);
       }
+
       if (data.items && Array.isArray(data.items) && data.items.length > 0) {
         const formattedItems = data.items.map((it: any, idx: number) => ({
           id: `scanned-${idx}-${Date.now()}`,
@@ -214,7 +278,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         setShowItemsEditor(true);
       }
 
-      setScanSuccessMsg("✨ AI Chek muvaffaqiyatli tahlil qilindi va ma'lumotlar to'ldirildi!");
+      setScanSuccessMsg(`✨ AI Chek tahlil qilindi! Do'kon: "${finalTitle}", Summa: ${rawAmount ? formatInput(rawAmount.toString()) : '0'} ${currency}`);
     } catch (err: any) {
       console.error("Scan receipt error:", err);
       setError(err?.message || "Chekni AI tahlil qilishda xatolik. Rasmni saqlab, ma'lumotlarni qo'lda kiritishingiz mumkin.");

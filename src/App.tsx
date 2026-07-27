@@ -19,7 +19,7 @@ import {
   fetchUserDataFromFirestore,
   migrateLocalDataToFirestore
 } from './lib/storage';
-import { Transaction, UserProfile } from './types';
+import { Transaction, UserProfile, ACCENT_THEMES } from './types';
 import { Header } from './components/Header';
 import { BalanceCard } from './components/BalanceCard';
 import { IncomeExpenseSummary } from './components/IncomeExpenseSummary';
@@ -30,6 +30,7 @@ import { HistoryScreen } from './components/HistoryScreen';
 import { InsightsScreen } from './components/InsightsScreen';
 import { ProfileScreen } from './components/ProfileScreen';
 import { AboutScreen } from './components/AboutScreen';
+import { LiquidGlassNavbar } from './components/LiquidGlassNavbar';
 import { AdminPanel } from './components/AdminPanel';
 import { AdminAuthModal } from './components/AdminAuthModal';
 import { AuthScreen } from './components/AuthScreen';
@@ -246,12 +247,12 @@ export default function App() {
     const sY = sunday.getFullYear();
     
     if (mY !== sY) {
-      return `${mD}-${mM}, ${mY} - ${sD}-${sM}, ${sY}`;
+      return `${mD} ${mM} - ${sD} ${sM}`;
     }
     if (mM !== sM) {
-      return `${mD}-${mM} - ${sD}-${sM}, ${mY}`;
+      return `${mD}-${mM} - ${sD}-${sM}`;
     }
-    return `${mD}-${sD} ${mM}, ${mY}-yil`;
+    return `${mD}-${sD} ${mM}`;
   };
 
   // Recalculated dynamic metrics based on loaded transactions (All-time overall balance)
@@ -538,6 +539,7 @@ export default function App() {
               percentageChange={percentageChange}
               periodLabel="Jami Mavjud Balans"
               baseBalance={baseBalance}
+              accentTheme={profile.accentTheme}
               onUpdateBaseBalance={(newVal) => {
                 setBaseBalance(newVal);
                 saveBaseBalance(newVal, authUser?.uid);
@@ -585,12 +587,12 @@ export default function App() {
                   <span>Barchasi</span>
                 </button>
               </div>
-              <div className="flex items-center justify-between px-1">
-                <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-white/5 px-2.5 py-1 rounded-lg">
+              <div className="flex items-center justify-between gap-1.5 px-1 min-w-0">
+                <span className="text-[10px] sm:text-[11px] font-bold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-white/5 px-2.5 py-1 rounded-lg truncate whitespace-nowrap">
                   {getPeriodLabel()}
                 </span>
                 {dashboardPeriod !== 'barchasi' && (
-                  <span className="text-[9px] font-extrabold uppercase tracking-widest text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-md animate-pulse">
+                  <span className="text-[9px] font-extrabold uppercase tracking-wider text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-md animate-pulse shrink-0 whitespace-nowrap">
                     Auto-Reset Active
                   </span>
                 )}
@@ -654,7 +656,7 @@ export default function App() {
         );
       case 'about':
         return (
-          <AboutScreen />
+          <AboutScreen accentTheme={profile.accentTheme} />
         );
     }
   };
@@ -717,12 +719,13 @@ export default function App() {
         avatarUrl={profile.avatarUrl} 
         userName={profile.name}
         userEmail={profile.email}
+        accentTheme={profile.accentTheme}
         onAdminClick={handleOpenAdminPanel}
         onLogoClick={() => setShowSplash(true)}
       />
 
       {/* Main Container */}
-      <main className="pt-20 px-4 max-w-2xl mx-auto">
+      <main className="pt-20 pb-28 px-4 max-w-2xl mx-auto">
         {renderActiveScreen()}
       </main>
 
@@ -730,88 +733,24 @@ export default function App() {
       {activeTab === 'home' && (
         <button 
           onClick={handleOpenAddModal}
-          className="fixed bottom-24 right-6 w-14 h-14 bg-primary hover:bg-primary/95 text-white rounded-full shadow-2xl flex items-center justify-center z-40 active:scale-90 transition-all duration-200 cursor-pointer"
+          className={`fixed bottom-20 right-4 w-13 h-13 bg-gradient-to-tr ${
+            (ACCENT_THEMES[profile.accentTheme || 'blue'] || ACCENT_THEMES.blue).fabGradient
+          } text-white rounded-full ${
+            (ACCENT_THEMES[profile.accentTheme || 'blue'] || ACCENT_THEMES.blue).fabShadow
+          } border border-white/30 flex items-center justify-center z-40 active:scale-90 transition-all duration-200 cursor-pointer`}
           aria-label="Add transaction"
           id="add-transaction-fab"
         >
-          <Plus size={28} />
+          <Plus size={26} />
         </button>
       )}
 
-      {/* Bottom Nav Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 w-full z-40 flex justify-around items-center px-1.5 pb-3.5 pt-2 bg-white/95 dark:bg-[#131b2e]/95 backdrop-blur-md border-t border-gray-100 dark:border-white/5 shadow-[0_-4px_12px_rgba(0,0,0,0.03)] rounded-t-2xl max-w-2xl mx-auto">
-        
-        {/* Tab 1: Asosiy */}
-        <button 
-          onClick={() => setActiveTab('home')}
-          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all duration-200 cursor-pointer active:scale-90 min-w-0 ${
-            activeTab === 'home'
-              ? 'bg-primary/10 dark:bg-primary-container text-primary dark:text-white'
-              : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300'
-          }`}
-          id="nav-home-tab"
-        >
-          <Grid2X2 size={19} />
-          <span className="text-[10px] font-bold mt-0.5 whitespace-nowrap">Asosiy</span>
-        </button>
-
-        {/* Tab 2: Tarix */}
-        <button 
-          onClick={() => setActiveTab('history')}
-          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all duration-200 cursor-pointer active:scale-90 min-w-0 ${
-            activeTab === 'history'
-              ? 'bg-primary/10 dark:bg-primary-container text-primary dark:text-white'
-              : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300'
-          }`}
-          id="nav-history-tab"
-        >
-          <ReceiptText size={19} />
-          <span className="text-[10px] font-bold mt-0.5 whitespace-nowrap">Tarix</span>
-        </button>
-
-        {/* Tab 3: Tahlil */}
-        <button 
-          onClick={() => setActiveTab('insights')}
-          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all duration-200 cursor-pointer active:scale-90 min-w-0 ${
-            activeTab === 'insights'
-              ? 'bg-primary/10 dark:bg-primary-container text-primary dark:text-white'
-              : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300'
-          }`}
-          id="nav-insights-tab"
-        >
-          <BarChart3 size={19} />
-          <span className="text-[10px] font-bold mt-0.5 whitespace-nowrap">Tahlil</span>
-        </button>
-
-        {/* Tab 4: Profil */}
-        <button 
-          onClick={() => setActiveTab('profile')}
-          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all duration-200 cursor-pointer active:scale-90 min-w-0 ${
-            activeTab === 'profile'
-              ? 'bg-primary/10 dark:bg-primary-container text-primary dark:text-white'
-              : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300'
-          }`}
-          id="nav-profile-tab"
-        >
-          <User size={19} />
-          <span className="text-[10px] font-bold mt-0.5 whitespace-nowrap">Profil</span>
-        </button>
-
-        {/* Tab 5: Ilova / Haqida */}
-        <button 
-          onClick={() => setActiveTab('about')}
-          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all duration-200 cursor-pointer active:scale-90 min-w-0 ${
-            activeTab === 'about'
-              ? 'bg-primary/10 dark:bg-primary-container text-primary dark:text-white'
-              : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300'
-          }`}
-          id="nav-about-tab"
-        >
-          <Info size={19} />
-          <span className="text-[10px] font-bold mt-0.5 whitespace-nowrap">Ilova</span>
-        </button>
-
-      </nav>
+      {/* Liquid Glass Bottom Navigation Bar */}
+      <LiquidGlassNavbar 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        accentTheme={profile.accentTheme}
+      />
 
       {/* Popover / Overlay Modal for adding/editing transaction */}
       <TransactionModal 

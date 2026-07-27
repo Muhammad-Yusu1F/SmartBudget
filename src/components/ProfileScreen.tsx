@@ -4,7 +4,8 @@
  */
 
 import React, { useState, useRef } from 'react';
-import { UserProfile, Transaction } from '../types';
+import { motion } from 'motion/react';
+import { UserProfile, Transaction, AccentTheme, ACCENT_THEMES } from '../types';
 import { 
   User, 
   Mail, 
@@ -26,7 +27,11 @@ import {
   ShieldCheck,
   CloudCheck,
   Smartphone,
-  FileText
+  FileText,
+  Palette,
+  Heart,
+  Leaf,
+  Crown
 } from 'lucide-react';
 import { 
   triggerInstantNotification, 
@@ -166,6 +171,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const [balanceInput, setBalanceInput] = useState(baseBalance.toString());
   const [notificationsEnabled, setNotificationsEnabled] = useState(profile.notificationsEnabled ?? true);
   const [notificationTime, setNotificationTime] = useState(profile.notificationTime || '20:00');
+  const [selectedAccent, setSelectedAccent] = useState<AccentTheme>(profile.accentTheme || 'blue');
 
   // Parse initial local phone digits
   const getInitialPhoneDigits = (rawPhone?: string): string => {
@@ -260,7 +266,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       monthlyBudget: monthlyBudget ? parseFloat(monthlyBudget) : undefined,
       notificationsEnabled,
       notificationTime,
-      phoneNumber: phoneDigits.trim() ? `+998${phoneDigits.replace(/\s/g, '')}` : ''
+      phoneNumber: phoneDigits.trim() ? `+998${phoneDigits.replace(/\s/g, '')}` : '',
+      accentTheme: selectedAccent
     };
 
     const parsedBalance = parseFloat(balanceInput);
@@ -395,6 +402,86 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
         Profil va Sozlamalar
       </h2>
+
+      {/* Compact Interactive Theme Selector Bar */}
+      <div className="bg-white dark:bg-[#131b2e] border border-gray-100 dark:border-white/5 rounded-2xl p-3 shadow-xs space-y-2.5">
+        <div className="flex items-center justify-between px-0.5">
+          <div className="flex items-center gap-2">
+            <div className={`w-7 h-7 rounded-lg ${ACCENT_THEMES[selectedAccent]?.badgeBg || 'bg-blue-500/10'} ${ACCENT_THEMES[selectedAccent]?.badgeText || 'text-blue-600'} flex items-center justify-center shrink-0 transition-colors duration-300`}>
+              <Palette size={15} />
+            </div>
+            <div>
+              <h3 className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                Ilova Mavzusi
+              </h3>
+            </div>
+          </div>
+
+          <motion.span 
+            key={selectedAccent}
+            initial={{ scale: 0.85, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+            className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${ACCENT_THEMES[selectedAccent]?.badgeBg} ${ACCENT_THEMES[selectedAccent]?.badgeText} flex items-center gap-1 border border-current/20 shadow-2xs`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full animate-ping" style={{ backgroundColor: ACCENT_THEMES[selectedAccent]?.colorHex }} />
+            {ACCENT_THEMES[selectedAccent]?.name}
+          </motion.span>
+        </div>
+
+        {/* Horizontal Capsule Segment Controls */}
+        <div className="grid grid-cols-4 gap-1.5 p-1 bg-gray-100/70 dark:bg-white/5 rounded-xl border border-gray-200/50 dark:border-white/5 relative">
+          {(Object.keys(ACCENT_THEMES) as AccentTheme[]).map((themeKey) => {
+            const themeConfig = ACCENT_THEMES[themeKey];
+            const isSelected = selectedAccent === themeKey;
+
+            const ThemeIcon = 
+              themeKey === 'blue' ? Sparkles :
+              themeKey === 'pink' ? Heart :
+              themeKey === 'emerald' ? Leaf : Crown;
+
+            return (
+              <motion.button
+                key={themeKey}
+                type="button"
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.94 }}
+                onClick={() => {
+                  setSelectedAccent(themeKey);
+                  const updated = { ...profile, accentTheme: themeKey };
+                  onUpdateProfile(updated);
+                  onShowWebToast?.(`🎨 Mavzu "${themeConfig.name}" sozladi!`);
+                }}
+                className={`relative py-1.5 px-1 rounded-lg transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 text-center ${
+                  isSelected
+                    ? 'text-gray-900 dark:text-white font-extrabold shadow-sm'
+                    : 'text-gray-500 dark:text-gray-400 font-medium hover:text-gray-800 dark:hover:text-gray-200'
+                }`}
+              >
+                {/* Active Sliding Background Pill */}
+                {isSelected && (
+                  <motion.div
+                    layoutId="activeThemePill"
+                    className="absolute inset-0 bg-white dark:bg-white/15 rounded-lg border border-gray-200/80 dark:border-white/15 shadow-xs"
+                    transition={{ type: 'spring', stiffness: 450, damping: 30 }}
+                  />
+                )}
+
+                <div 
+                  className="w-4 h-4 rounded-full flex items-center justify-center text-white shrink-0 relative z-10 shadow-2xs transition-transform duration-200"
+                  style={{ backgroundColor: themeConfig.colorHex }}
+                >
+                  <ThemeIcon size={9} />
+                </div>
+
+                <span className="text-[11px] relative z-10 truncate">
+                  {themeKey === 'blue' ? "Ko'k" : themeKey === 'pink' ? 'Pushti' : themeKey === 'emerald' ? 'Zumrad' : 'Siyohrang'}
+                </span>
+              </motion.button>
+            );
+          })}
+        </div>
+      </div>
 
       {/* Profile Card Summary & Avatar Customizer */}
       <div className="bg-white dark:bg-[#131b2e] border border-gray-100 dark:border-white/5 rounded-2xl p-5 shadow-sm space-y-5">

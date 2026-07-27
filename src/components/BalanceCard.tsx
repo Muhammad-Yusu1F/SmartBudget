@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { TrendingUp, TrendingDown, Wallet, Check, X, PlusCircle, ArrowUpRight, RotateCcw } from 'lucide-react';
 import { formatAmount } from '../lib/format';
+import { AccentTheme, ACCENT_THEMES } from '../types';
 
 interface BalanceCardProps {
   balance: number;
@@ -14,6 +15,7 @@ interface BalanceCardProps {
   periodLabel?: string;
   baseBalance?: number;
   onUpdateBaseBalance?: (newBase: number) => void;
+  accentTheme?: AccentTheme;
 }
 
 export const BalanceCard: React.FC<BalanceCardProps> = ({ 
@@ -22,12 +24,15 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({
   percentageChange = 12.5,
   periodLabel = "Jami Mavjud Balans",
   baseBalance = 0,
-  onUpdateBaseBalance
+  onUpdateBaseBalance,
+  accentTheme = 'blue'
 }) => {
   const isPositive = balance >= 0;
   const [isEditingBase, setIsEditingBase] = useState(false);
   const [mode, setMode] = useState<'set' | 'add'>('set');
   const [inputVal, setInputVal] = useState(baseBalance.toString());
+
+  const currentAccent = ACCENT_THEMES[accentTheme] || ACCENT_THEMES.blue;
 
   const handleSaveBase = (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,7 +73,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({
 
   return (
     <section className="mt-2 px-1" id="total-balance-card">
-      <div className="main-gradient rounded-2xl p-6 text-white shadow-xl relative overflow-hidden group border border-white/10">
+      <div className={`bg-gradient-to-br ${currentAccent.cardGradient} rounded-2xl p-6 text-white shadow-xl relative overflow-hidden group border border-white/10 transition-all duration-300`}>
         {/* Decorative background glass elements */}
         <div className="absolute top-0 right-0 w-36 h-36 bg-white/10 rounded-full -mr-12 -mt-12 blur-2xl group-hover:scale-110 transition-transform duration-500"></div>
         <div className="absolute -bottom-8 -left-8 w-24 h-24 bg-primary-container/20 rounded-full blur-xl"></div>
@@ -76,10 +81,10 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({
         <div className="relative z-10 flex flex-col justify-between h-full space-y-4">
           <div className="flex items-start justify-between gap-2">
             <div className="w-full">
-              <div className="flex items-center justify-between text-white/90 mb-1.5">
-                <p className="text-[11px] font-extrabold uppercase tracking-widest flex items-center gap-1.5 text-white/80">
-                  <Wallet size={14} className="text-violet-200" />
-                  <span>{periodLabel}</span>
+              <div className="flex items-center justify-between gap-2 text-white/90 mb-1.5 min-w-0">
+                <p className="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider sm:tracking-widest flex items-center gap-1.5 text-white/80 truncate">
+                  <Wallet size={14} className="text-violet-200 shrink-0" />
+                  <span className="truncate">{periodLabel}</span>
                 </p>
                 {onUpdateBaseBalance && (
                   <button
@@ -89,36 +94,36 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({
                       setMode('set');
                       setIsEditingBase(true);
                     }}
-                    className="flex items-center gap-1.5 bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-3 py-1.5 rounded-xl backdrop-blur-md border border-white/20 shadow-xs transition-all cursor-pointer active:scale-95"
+                    className="flex items-center gap-1 bg-white/20 hover:bg-white/30 text-white text-[11px] sm:text-xs font-bold px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl backdrop-blur-md border border-white/20 shadow-xs transition-all cursor-pointer active:scale-95 shrink-0 whitespace-nowrap"
                     title="Boshlang'ich pulni kiritish / o'zgartirish"
                   >
-                    <PlusCircle size={14} className="text-emerald-300" />
-                    <span>Pul kiritish</span>
+                    <PlusCircle size={13} className="text-emerald-300 shrink-0" />
+                    <span className="whitespace-nowrap">Pul kiritish</span>
                   </button>
                 )}
               </div>
 
-              <h2 className="text-2xl min-[360px]:text-3xl min-[400px]:text-4xl font-extrabold tracking-tight font-tabular truncate max-w-full drop-shadow-sm" title={formatAmount(balance, currency)}>
+              <h2 className="text-2xl min-[360px]:text-3xl min-[400px]:text-4xl font-extrabold tracking-tight font-tabular truncate max-w-full drop-shadow-sm whitespace-nowrap" title={formatAmount(balance, currency)}>
                 {formatAmount(balance, currency)}
               </h2>
             </div>
           </div>
           
-          <div className="flex items-center justify-between pt-2.5 border-t border-white/15">
-            <div className="flex items-center gap-1.5 bg-white/20 hover:bg-white/25 transition-all px-3 py-1 rounded-full backdrop-blur-md text-xs font-semibold">
+          <div className="flex items-center justify-between gap-2 pt-2.5 border-t border-white/15 min-w-0">
+            <div className="flex items-center gap-1.5 bg-white/20 hover:bg-white/25 transition-all px-2.5 sm:px-3 py-1 rounded-full backdrop-blur-md text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap">
               {isPositive ? (
-                <TrendingUp size={14} className="text-emerald-300 shrink-0" />
+                <TrendingUp size={13} className="text-emerald-300 shrink-0" />
               ) : (
-                <TrendingDown size={14} className="text-rose-300 shrink-0" />
+                <TrendingDown size={13} className="text-rose-300 shrink-0" />
               )}
               <span className="whitespace-nowrap">
                 {isPositive ? 'Mavjud Balans' : 'Salbiy balans'}
               </span>
             </div>
 
-            <div className="text-white/70 text-[10px] font-bold tracking-wider uppercase whitespace-nowrap flex items-center gap-1">
-              <ArrowUpRight size={12} className="text-emerald-300" />
-              <span>Avto Hisoblanadi</span>
+            <div className="text-white/70 text-[9px] sm:text-[10px] font-bold tracking-wider uppercase whitespace-nowrap flex items-center gap-1 shrink-0">
+              <ArrowUpRight size={11} className="text-emerald-300 shrink-0" />
+              <span className="whitespace-nowrap">Avto Hisoblanadi</span>
             </div>
           </div>
         </div>

@@ -238,21 +238,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const maxChartCount = Math.max(...chartData.map(d => d.count), 1);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-[#faf8ff] dark:bg-[#0f172a] rounded-3xl border border-gray-200/40 dark:border-white/10 w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-[#faf8ff] dark:bg-[#0f172a] rounded-3xl border border-gray-200/40 dark:border-white/10 w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
         
         {/* Header */}
-        <div className="p-5 bg-gradient-to-r from-[#2116d0] to-[#006c49] text-white flex items-center justify-between shadow-md shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-white/15 flex items-center justify-center backdrop-blur-md border border-white/20 shadow-inner">
-              <Coins size={22} className="text-amber-300 animate-pulse" />
+        <div className="p-4 sm:p-5 bg-gradient-to-r from-[#2116d0] to-[#006c49] text-white flex items-center justify-between shadow-md shrink-0">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-white/15 flex items-center justify-center backdrop-blur-md border border-white/20 shadow-inner shrink-0">
+              <Coins size={20} className="text-amber-300 animate-pulse" />
             </div>
             <div>
-              <h3 className="font-extrabold text-sm tracking-tight flex items-center gap-1.5">
-                SmartBudget Sinxronlash Markazi
+              <h3 className="font-extrabold text-xs sm:text-sm tracking-tight flex items-center gap-1.5">
+                SmartBudget Admin Markazi
               </h3>
-              <p className="text-[10px] text-teal-100 font-bold uppercase tracking-wider flex items-center gap-1">
-                <Cloud size={10} className="text-emerald-300" /> Onlayn Ma'lumotlar Bazasi
+              <p className="text-[9px] sm:text-[10px] text-teal-100 font-bold uppercase tracking-wider flex items-center gap-1">
+                <Smartphone size={10} className="text-emerald-300" /> Mobil & Kompyuter To'liq Faol
               </p>
             </div>
           </div>

@@ -1,4 +1,5 @@
 import React from 'react';
+import { AccentTheme, ACCENT_THEMES } from '../types';
 import { 
   Info, 
   HelpCircle, 
@@ -15,12 +16,18 @@ import {
   Send
 } from 'lucide-react';
 
-export const AboutScreen: React.FC = () => {
+interface AboutScreenProps {
+  accentTheme?: AccentTheme;
+}
+
+export const AboutScreen: React.FC<AboutScreenProps> = ({ accentTheme = 'blue' }) => {
+  const currentAccent = ACCENT_THEMES[accentTheme] || ACCENT_THEMES.blue;
+
   return (
     <div className="space-y-6 pb-8 animate-fade-in" id="about-screen">
       {/* Header section */}
       <div className="text-center space-y-2 py-2">
-        <div className="inline-flex p-3 bg-primary/10 dark:bg-primary-container rounded-2xl text-primary dark:text-white mb-1.5 shadow-sm">
+        <div className={`inline-flex p-3.5 bg-gradient-to-tr ${currentAccent.headerIconGradient} text-white rounded-2xl mb-1.5 shadow-md shadow-sky-500/10 transition-all duration-300`}>
           <Info size={28} />
         </div>
         <h2 className="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight">
@@ -68,17 +75,32 @@ export const AboutScreen: React.FC = () => {
           Dasturning asosiy imkoniyatlari
         </h4>
 
-        {/* Item 1: AI Chek Skaneri */}
+        {/* Item 1: Rangli Mavzular Rejimi */}
+        <div className="bg-white dark:bg-[#131b2e] border border-gray-100 dark:border-white/5 rounded-2xl p-4 flex gap-4 shadow-sm">
+          <div className="p-2.5 bg-pink-500/10 text-pink-500 rounded-xl shrink-0 h-10 w-10 flex items-center justify-center">
+            <Sparkles size={20} />
+          </div>
+          <div className="space-y-1">
+            <h5 className="text-sm font-bold text-gray-800 dark:text-white flex items-center gap-1.5">
+              <span>Mavzular va Rang Rejimlari (4 xil Accent)</span>
+            </h5>
+            <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+              Dasturni o'zingizga ma'qul rangda sozlang: Moviy Ko'k, Yoqimli Pushti, Yashil Zumrad va Qirollik Siyohrang. Profil menyusida bir bosish bilan barcha tugmalar, kartalar va menyu dizayni o'zgaradi.
+            </p>
+          </div>
+        </div>
+
+        {/* Item 2: AI Chek Skaneri */}
         <div className="bg-white dark:bg-[#131b2e] border border-gray-100 dark:border-white/5 rounded-2xl p-4 flex gap-4 shadow-sm">
           <div className="p-2.5 bg-violet-500/10 text-violet-500 rounded-xl shrink-0 h-10 w-10 flex items-center justify-center">
             <Sparkles size={20} />
           </div>
           <div className="space-y-1">
             <h5 className="text-sm font-bold text-gray-800 dark:text-white flex items-center gap-1.5">
-              <span>AI Chek Skaneri (Kamera & Galereya)</span>
+              <span>AI Chek va Skrinshot Skaneri</span>
             </h5>
             <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-              Xarid chekingizni real vaqtda kamerada rasmga oling yoki galereyadan tanlang. Sun'iy intelekt avtomatik ravishda chekdagi jami summa, do'kon nomi va toifani aniqlab beradi.
+              Telefonda tushirilgan qog'oz kassa cheklari, Soliq QR-cheklari yoki Click, Payme, Uzum va Yandex Go skrinshotlarini rasmga oling. Sun'iy intellekt avtomatik tarzda do'kon nomi, umumiy summa va xarid mahsulotlarini aniqlaydi.
             </p>
           </div>
         </div>
