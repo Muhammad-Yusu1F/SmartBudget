@@ -5,7 +5,7 @@
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, initializeFirestore, persistentLocalCache, memoryLocalCache } from 'firebase/firestore';
+import { getFirestore, initializeFirestore, memoryLocalCache } from 'firebase/firestore';
 
 const getEnv = (key: string): string => {
   // Try Vite client-side prefixed env, non-prefixed env, or empty string fallback
@@ -41,16 +41,10 @@ export const auth = getAuth(app);
 let firestoreDb;
 try {
   firestoreDb = initializeFirestore(app, {
-    localCache: persistentLocalCache({})
+    localCache: memoryLocalCache()
   });
 } catch {
-  try {
-    firestoreDb = initializeFirestore(app, {
-      localCache: memoryLocalCache()
-    });
-  } catch {
-    firestoreDb = getFirestore(app);
-  }
+  firestoreDb = getFirestore(app);
 }
 
 export const db = firestoreDb;

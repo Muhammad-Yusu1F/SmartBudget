@@ -152,9 +152,6 @@ export const syncTransactionsToFirestore = async (uid: string, txs: Transaction[
     });
   } catch (err: any) {
     console.warn('Firestore syncTransactionsToFirestore warning:', err?.message || err);
-    if (err?.code !== 'permission-denied') {
-      throw err;
-    }
   }
 };
 
@@ -168,9 +165,6 @@ export const syncProfileToFirestore = async (uid: string, profile: UserProfile):
     });
   } catch (err: any) {
     console.warn('Firestore syncProfileToFirestore warning:', err?.message || err);
-    if (err?.code !== 'permission-denied') {
-      throw err;
-    }
   }
 };
 
@@ -184,9 +178,6 @@ export const syncBaseBalanceToFirestore = async (uid: string, balance: number): 
     });
   } catch (err: any) {
     console.warn('Firestore syncBaseBalanceToFirestore warning:', err?.message || err);
-    if (err?.code !== 'permission-denied') {
-      throw err;
-    }
   }
 };
 
