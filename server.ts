@@ -223,7 +223,7 @@ app.post('/api/scan-receipt', async (req, res) => {
       const parts = imageBase64.split(';base64,');
       cleanBase64 = parts[1];
       const mimeMatch = parts[0].match(/data:(.*?);/);
-      if (mimeMatch) {
+      if (mimeMatch && (mimeMatch[1].startsWith('image/jpeg') || mimeMatch[1].startsWith('image/png') || mimeMatch[1].startsWith('image/webp'))) {
         mimeType = mimeMatch[1];
       }
     }
@@ -259,12 +259,14 @@ Javobni AYNAN va STRICTLY quyidagi JSON formatida qaytaring:
   ]
 }
 
-MUHIM TASHXIS QOIDALARI:
-- "amount" qiymatida harf, so'm, probel yoki nuqtasiz FAQAT bitta butun son bo'lsin.
-- Rasm biroz xira, qiyshiq, soyali yoki qiya bo'lsa ham, eng yaqin mos mantiqiy raqam va so'zlarni o'qing.
+MUHIM TASHXIS VA O'QISH QOIDALARI (XIRA VA PAST SIFATLI CHEKLAR UCHUN):
+- Rasm xira, qorong'u, soyali, qiyshiq, qog'oz buklangan yoki o'chib ketgan thermal kassa qog'ozi bo'lsa ham, eng yaqin mos mantiqiy raqamlar va so'zlarni OCR orqali tiklang va toping.
+- Agar do'kon nomi xira bo'lsa, chekning eng yuqori qismidagi eng katta yozuvni yoki soliq rekvizitlarini tahlil qilib taxminiy nomni oling.
+- Agar mahsulotlar ro'yxatidan ba'zi qatorlar o'qilmasa, o'qiladiganlarini kiriting va eng muhim bo'lgan JAMI (TOTAL / ИТОГО) summani va do'kon nomini aniqlashga ustuvorlik bering.
+- "amount" qiymatida harf, so'm, probel yoki nuqtasiz FAQAT bitta musbat butun son qaytaring.
 - JAVOB FAQAT TOZA JSON BO'LSIN, HECH QANDAY SHARH VA MARKDOWN BLOKSIZ.`;
 
-    const candidateModels = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-1.5-flash'];
+    const candidateModels = ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite'];
     let responseText = '';
     let lastError: any = null;
 
@@ -300,8 +302,8 @@ MUHIM TASHXIS QOIDALARI:
     }
 
     if (!responseText) {
-      const detail = lastError?.message || lastError || "AI orqali chekni o'qib bo'lmadi.";
-      throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+      console.error("All AI models failed during receipt scanning:", lastError);
+      throw new Error("AI xizmati hozirda javob bermadi. Chek ma'lumotlarini qo'lda kiritishingiz mumkin.");
     }
 
     let parsedData = null;
@@ -322,32 +324,43 @@ MUHIM TASHXIS QOIDALARI:
       return res.status(500).json({ success: false, error: "Chek ma'lumotlarini o'qib bo'lmadi." });
     }
 
-    // Ultra-reliable amount calculation & number extraction for mobile phone receipt photos
-    let totalAmount = 0;
-
-    // 1. Try parsing parsedData.amount if present
-    if (parsedData.amount !== undefined && parsedData.amount !== null) {
-      if (typeof parsedData.amount === 'number' && !isNaN(parsedData.amount) && parsedData.amount > 0) {
-        totalAmount = Math.round(parsedData.amount);
-      } else if (typeof parsedData.amount === 'string') {
-        const cleanDigits = parsedData.amount.replace(/[^\d]/g, '');
+    // Helper to fix UZS amounts where thousands separator dot/space turned into a decimal float (e.g. 763.500 -> 763.5)
+    const normalizeUzsAmount = (val: any): number => {
+      if (val === null || val === undefined) return 0;
+      if (typeof val === 'number') {
+        if (isNaN(val) || val <= 0) return 0;
+        // If float < 1000 with decimals (e.g. 763.5 or 12.5 or 763.500)
+        if (val < 1000 && !Number.isInteger(val)) {
+          const strVal = val.toString();
+          const parts = strVal.split('.');
+          if (parts.length === 2) {
+            const integerPart = parts[0];
+            const decimalPart = parts[1].padEnd(3, '0').slice(0, 3);
+            const combined = parseInt(integerPart + decimalPart, 10);
+            if (!isNaN(combined) && combined > 0) return combined;
+          }
+        }
+        return Math.round(val);
+      }
+      if (typeof val === 'string') {
+        const clean = val.trim();
+        const cleanDigits = clean.replace(/[^\d]/g, '');
         if (cleanDigits) {
-          totalAmount = parseInt(cleanDigits, 10);
+          const parsed = parseInt(cleanDigits, 10);
+          if (!isNaN(parsed) && parsed > 0) return parsed;
         }
       }
-    }
+      return 0;
+    };
+
+    // Ultra-reliable amount calculation & number extraction for mobile phone receipt photos
+    let totalAmount = normalizeUzsAmount(parsedData.amount);
 
     // 2. Format & parse item list prices
     let itemsSum = 0;
     if (Array.isArray(parsedData.items) && parsedData.items.length > 0) {
       parsedData.items = parsedData.items.map((it: any, idx: number) => {
-        let itemPrice = 0;
-        if (typeof it.price === 'number' && !isNaN(it.price)) {
-          itemPrice = Math.round(it.price);
-        } else if (typeof it.price === 'string') {
-          const pDigits = it.price.replace(/[^\d]/g, '');
-          if (pDigits) itemPrice = parseInt(pDigits, 10);
-        }
+        const itemPrice = normalizeUzsAmount(it.price);
         itemsSum += itemPrice;
         return {
           id: String(it.id || idx + 1),
@@ -360,6 +373,18 @@ MUHIM TASHXIS QOIDALARI:
     // 3. If totalAmount is 0 but items exist, use itemsSum!
     if ((!totalAmount || totalAmount === 0) && itemsSum > 0) {
       totalAmount = itemsSum;
+    }
+
+    // 4. Ultimate Fallback: scan description or responseText for any valid numbers >= 500
+    if (!totalAmount || totalAmount === 0) {
+      const fullText = (responseText + ' ' + (parsedData.description || '') + ' ' + (parsedData.title || ''));
+      const foundNumbers = fullText.match(/\b\d{4,9}\b/g);
+      if (foundNumbers && foundNumbers.length > 0) {
+        const parsedNums = foundNumbers.map(n => parseInt(n, 10)).filter(n => n >= 500 && n <= 100000000);
+        if (parsedNums.length > 0) {
+          totalAmount = Math.max(...parsedNums);
+        }
+      }
     }
 
     parsedData.amount = totalAmount;

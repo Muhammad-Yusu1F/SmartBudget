@@ -109,66 +109,53 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   // Mobile-optimized image processor & compressor for high-accuracy AI receipt OCR
   const compressImage = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
-      const renderToCanvas = (source: HTMLImageElement | ImageBitmap, origWidth: number, origHeight: number) => {
-        try {
-          const canvas = document.createElement('canvas');
-          // High clarity max dimensions for mobile camera thermal receipts (1600 x 2400 max)
-          const MAX_WIDTH = 1600;
-          const MAX_HEIGHT = 2400;
-          let width = origWidth;
-          let height = origHeight;
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            const MAX_WIDTH = 1200;
+            const MAX_HEIGHT = 1600;
+            let width = img.width;
+            let height = img.height;
 
-          if (width > height) {
-            if (width > MAX_WIDTH) {
-              height = Math.round(height * (MAX_WIDTH / width));
-              width = MAX_WIDTH;
+            if (width > height) {
+              if (width > MAX_WIDTH) {
+                height = Math.round(height * (MAX_WIDTH / width));
+                width = MAX_WIDTH;
+              }
+            } else {
+              if (height > MAX_HEIGHT) {
+                width = Math.round(width * (MAX_HEIGHT / height));
+                height = MAX_HEIGHT;
+              }
             }
-          } else {
-            if (height > MAX_HEIGHT) {
-              width = Math.round(width * (MAX_HEIGHT / height));
-              height = MAX_HEIGHT;
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.imageSmoothingEnabled = true;
+              ctx.imageSmoothingQuality = 'high';
+              ctx.drawImage(img, 0, 0, width, height);
             }
+            // JPEG quality 0.82 ensures lightweight payload (~180KB) and crisp OCR contrast on mobile
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+            resolve(dataUrl);
+          } catch (err) {
+            // Fallback to original raw dataUrl if canvas fails
+            resolve(event.target?.result as string);
           }
-
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
-            ctx.drawImage(source, 0, 0, width, height);
-          }
-          // JPEG quality 0.85 ensures crisp thermal printing contrast for OCR
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-          resolve(dataUrl);
-        } catch (err) {
-          reject(err);
-        }
-      };
-
-      if (typeof window !== 'undefined' && 'createImageBitmap' in window) {
-        createImageBitmap(file)
-          .then((bitmap) => {
-            renderToCanvas(bitmap, bitmap.width, bitmap.height);
-          })
-          .catch(() => {
-            fallbackRead();
-          });
-      } else {
-        fallbackRead();
-      }
-
-      function fallbackRead() {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = (event) => {
-          const img = new Image();
-          img.src = event.target?.result as string;
-          img.onload = () => renderToCanvas(img, img.width, img.height);
-          img.onerror = (err) => reject(err);
         };
-        reader.onerror = (err) => reject(err);
-      }
+        img.onerror = () => {
+          // If image load fails, attempt direct FileReader result
+          resolve(event.target?.result as string);
+        };
+      };
+      reader.onerror = (err) => reject(err);
     });
   };
 
@@ -176,6 +163,9 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   const handleReceiptFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Reset input value so mobile browsers allow re-selecting the same file or taking a new photo
+    const targetInput = e.target;
 
     setIsScanning(true);
     setError('');
@@ -194,17 +184,24 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         });
       } catch (netErr) {
         throw new Error("Serverga ulanib bo'lmadi. Internet aloqasini tekshiring.");
+      } finally {
+        targetInput.value = '';
       }
 
-      let resData;
+      const responseText = await response.text();
+      let resData: any = null;
+
       try {
-        resData = await response.json();
+        resData = JSON.parse(responseText);
       } catch {
-        throw new Error("Server noto'g'ri javob qaytardi.");
+        if (response.status === 413) {
+          throw new Error("Rasm hajmi juda katta. Iltimos qaytadan rasmga oling.");
+        }
+        throw new Error(`Server xatosi (${response.status}): Chek ma'lumotlarini o'qib bo'lmadi.`);
       }
 
-      if (!response.ok || !resData.success) {
-        throw new Error(resData.error || "Chekni skanerlashda xatolik yuz berdi.");
+      if (!response.ok || !resData || !resData.success) {
+        throw new Error(resData?.error || "Chekni skanerlashda xatolik yuz berdi.");
       }
 
       const data = resData.data;
@@ -217,26 +214,39 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       
       setTitle(finalTitle);
 
+      // Helper to fix UZS amounts where thousands separator dot/space turned into a decimal float
+      const normalizeVal = (val: any): number => {
+        if (val === null || val === undefined) return 0;
+        if (typeof val === 'number') {
+          if (isNaN(val) || val <= 0) return 0;
+          if (val < 1000 && !Number.isInteger(val)) {
+            const strVal = val.toString();
+            const parts = strVal.split('.');
+            if (parts.length === 2) {
+              const integerPart = parts[0];
+              const decimalPart = parts[1].padEnd(3, '0').slice(0, 3);
+              const combined = parseInt(integerPart + decimalPart, 10);
+              if (!isNaN(combined) && combined > 0) return combined;
+            }
+          }
+          return Math.round(val);
+        }
+        if (typeof val === 'string') {
+          const digitsOnly = val.replace(/[^\d]/g, '');
+          if (digitsOnly) {
+            const parsed = parseInt(digitsOnly, 10);
+            if (!isNaN(parsed) && parsed > 0) return parsed;
+          }
+        }
+        return 0;
+      };
+
       // Clean extraction of amount for phone receipts
-      let rawAmount = 0;
-      if (typeof data.amount === 'number' && !isNaN(data.amount) && data.amount > 0) {
-        rawAmount = data.amount;
-      } else if (data.amount) {
-        const digitsOnly = String(data.amount).replace(/[^\d]/g, '');
-        if (digitsOnly) rawAmount = parseInt(digitsOnly, 10);
-      }
+      let rawAmount = normalizeVal(data.amount);
 
       // Fallback 1: If amount is still 0, calculate sum from items
       if (rawAmount === 0 && data.items && Array.isArray(data.items) && data.items.length > 0) {
-        rawAmount = data.items.reduce((acc: number, it: any) => {
-          let p = 0;
-          if (typeof it.price === 'number' && !isNaN(it.price)) p = it.price;
-          else if (it.price) {
-            const pDigits = String(it.price).replace(/[^\d]/g, '');
-            if (pDigits) p = parseInt(pDigits, 10);
-          }
-          return acc + p;
-        }, 0);
+        rawAmount = data.items.reduce((acc: number, it: any) => acc + normalizeVal(it.price), 0);
       }
 
       if (rawAmount > 0) {
@@ -272,7 +282,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         const formattedItems = data.items.map((it: any, idx: number) => ({
           id: `scanned-${idx}-${Date.now()}`,
           name: String(it.name || 'Mahsulot'),
-          price: Number(it.price) || 0,
+          price: normalizeVal(it.price),
         }));
         setItems(formattedItems);
         setShowItemsEditor(true);
@@ -692,34 +702,34 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-2 mt-2 w-full max-w-xs">
-                    {/* Option A: Real Live Camera */}
-                    <label className="flex-1 bg-violet-600 hover:bg-violet-700 active:scale-95 text-white text-xs font-bold py-2.5 px-3 rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center">
-                      <Camera size={15} />
-                      <span>Kamera</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        onChange={handleReceiptFileChange}
-                        disabled={isScanning}
-                        className="hidden"
-                      />
-                    </label>
+                    <div className="flex items-center gap-2.5 mt-2 w-full max-w-xs">
+                      {/* Option A: Real Live Camera */}
+                      <label className="flex-1 bg-violet-600 hover:bg-violet-700 active:scale-95 text-white text-xs font-extrabold py-3 px-3 rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center min-h-[44px] touch-manipulation">
+                        <Camera size={16} />
+                        <span>Kamera</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          onChange={handleReceiptFileChange}
+                          disabled={isScanning}
+                          className="hidden"
+                        />
+                      </label>
 
-                    {/* Option B: Gallery File Picker */}
-                    <label className="flex-1 bg-white dark:bg-white/10 hover:bg-gray-100 dark:hover:bg-white/15 active:scale-95 text-gray-800 dark:text-white border border-gray-200 dark:border-white/10 text-xs font-bold py-2.5 px-3 rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center">
-                      <ImageIcon size={15} className="text-violet-500" />
-                      <span>Galereya</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleReceiptFileChange}
-                        disabled={isScanning}
-                        className="hidden"
-                      />
-                    </label>
-                  </div>
+                      {/* Option B: Gallery File Picker */}
+                      <label className="flex-1 bg-white dark:bg-white/10 hover:bg-gray-100 dark:hover:bg-white/15 active:scale-95 text-gray-800 dark:text-white border border-gray-200 dark:border-white/10 text-xs font-extrabold py-3 px-3 rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center min-h-[44px] touch-manipulation">
+                        <ImageIcon size={16} className="text-violet-500" />
+                        <span>Galereya</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleReceiptFileChange}
+                          disabled={isScanning}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
                 </div>
               )}
             </div>

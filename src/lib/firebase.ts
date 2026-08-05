@@ -5,7 +5,7 @@
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, initializeFirestore, persistentLocalCache, memoryLocalCache } from 'firebase/firestore';
 
 const getEnv = (key: string): string => {
   // Try Vite client-side prefixed env, non-prefixed env, or empty string fallback
@@ -36,6 +36,23 @@ export const isFirebaseConfigured = Boolean(
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+
+// Initialize Firestore safely handling IndexedDB storage quota / full disk exceptions
+let firestoreDb;
+try {
+  firestoreDb = initializeFirestore(app, {
+    localCache: persistentLocalCache({})
+  });
+} catch {
+  try {
+    firestoreDb = initializeFirestore(app, {
+      localCache: memoryLocalCache()
+    });
+  } catch {
+    firestoreDb = getFirestore(app);
+  }
+}
+
+export const db = firestoreDb;
 
 export default app;
