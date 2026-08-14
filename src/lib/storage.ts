@@ -36,12 +36,18 @@ const notifyError = (msg: string) => {
   console.warn('[Firestore Sync Warning]', msg);
 };
 
+const getUserKey = (baseKey: string, uid?: string): string => {
+  const activeUid = uid || auth.currentUser?.uid;
+  return activeUid ? `${baseKey}_${activeUid}` : baseKey;
+};
+
 // LocalStorage helpers (synchronous & offline-first)
-export const getTransactions = (): Transaction[] => {
+export const getTransactions = (uid?: string): Transaction[] => {
   try {
-    const data = localStorage.getItem(STORAGE_KEYS.TRANSACTIONS);
+    const key = getUserKey(STORAGE_KEYS.TRANSACTIONS, uid);
+    const data = localStorage.getItem(key);
     if (!data) {
-      localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(INITIAL_TRANSACTIONS));
+      localStorage.setItem(key, JSON.stringify(INITIAL_TRANSACTIONS));
       return INITIAL_TRANSACTIONS;
     }
     return JSON.parse(data);
@@ -52,13 +58,14 @@ export const getTransactions = (): Transaction[] => {
 };
 
 export const saveTransactions = (txs: Transaction[], uid?: string): void => {
+  const activeUid = uid || auth.currentUser?.uid;
   try {
-    localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(txs));
+    const key = getUserKey(STORAGE_KEYS.TRANSACTIONS, activeUid);
+    localStorage.setItem(key, JSON.stringify(txs));
   } catch (err) {
     console.error('Error saving transactions to localStorage:', err);
   }
 
-  const activeUid = uid || auth.currentUser?.uid;
   if (activeUid && auth.currentUser && auth.currentUser.uid === activeUid) {
     syncTransactionsToFirestore(activeUid, txs).catch((err: any) => {
       console.warn('Firestore saveTransactions warning:', err?.message || err);
@@ -66,17 +73,18 @@ export const saveTransactions = (txs: Transaction[], uid?: string): void => {
   }
 };
 
-export const getProfile = (): UserProfile => {
+export const getProfile = (uid?: string): UserProfile => {
   try {
-    const data = localStorage.getItem(STORAGE_KEYS.PROFILE);
+    const key = getUserKey(STORAGE_KEYS.PROFILE, uid);
+    const data = localStorage.getItem(key);
     if (!data) {
-      localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(INITIAL_PROFILE));
+      localStorage.setItem(key, JSON.stringify(INITIAL_PROFILE));
       return INITIAL_PROFILE;
     }
     const parsed = JSON.parse(data);
     if (parsed.currency === '$' || !parsed.currency) {
       parsed.currency = 'UZS';
-      localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(parsed));
+      localStorage.setItem(key, JSON.stringify(parsed));
     }
     return parsed;
   } catch (err) {
@@ -86,13 +94,14 @@ export const getProfile = (): UserProfile => {
 };
 
 export const saveProfile = (profile: UserProfile, uid?: string): void => {
+  const activeUid = uid || auth.currentUser?.uid;
   try {
-    localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
+    const key = getUserKey(STORAGE_KEYS.PROFILE, activeUid);
+    localStorage.setItem(key, JSON.stringify(profile));
   } catch (err) {
     console.error('Error saving profile to localStorage:', err);
   }
 
-  const activeUid = uid || auth.currentUser?.uid;
   if (activeUid && auth.currentUser && auth.currentUser.uid === activeUid) {
     syncProfileToFirestore(activeUid, profile).catch((err: any) => {
       console.warn('Firestore saveProfile warning:', err?.message || err);
@@ -100,11 +109,12 @@ export const saveProfile = (profile: UserProfile, uid?: string): void => {
   }
 };
 
-export const getBaseBalance = (): number => {
+export const getBaseBalance = (uid?: string): number => {
   try {
-    const data = localStorage.getItem(STORAGE_KEYS.BASE_BALANCE);
+    const key = getUserKey(STORAGE_KEYS.BASE_BALANCE, uid);
+    const data = localStorage.getItem(key);
     if (data === null) {
-      localStorage.setItem(STORAGE_KEYS.BASE_BALANCE, '0');
+      localStorage.setItem(key, '0');
       return 0;
     }
     return parseFloat(data);
@@ -115,13 +125,14 @@ export const getBaseBalance = (): number => {
 };
 
 export const saveBaseBalance = (balance: number, uid?: string): void => {
+  const activeUid = uid || auth.currentUser?.uid;
   try {
-    localStorage.setItem(STORAGE_KEYS.BASE_BALANCE, balance.toString());
+    const key = getUserKey(STORAGE_KEYS.BASE_BALANCE, activeUid);
+    localStorage.setItem(key, balance.toString());
   } catch (err) {
     console.error('Error saving baseBalance to localStorage:', err);
   }
 
-  const activeUid = uid || auth.currentUser?.uid;
   if (activeUid && auth.currentUser && auth.currentUser.uid === activeUid) {
     syncBaseBalanceToFirestore(activeUid, balance).catch((err: any) => {
       console.warn('Firestore saveBaseBalance warning:', err?.message || err);
@@ -212,10 +223,10 @@ export const fetchUserDataFromFirestore = async (
 
     if (txSnap.exists()) {
       transactions = txSnap.data()?.items || [];
-      localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(transactions));
+      localStorage.setItem(getUserKey(STORAGE_KEYS.TRANSACTIONS, uid), JSON.stringify(transactions));
     } else {
       transactions = [];
-      localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify([]));
+      localStorage.setItem(getUserKey(STORAGE_KEYS.TRANSACTIONS, uid), JSON.stringify([]));
     }
 
     if (profSnap.exists()) {
@@ -230,15 +241,15 @@ export const fetchUserDataFromFirestore = async (
         notificationTime: data.notificationTime,
         phoneNumber: data.phoneNumber
       };
-      localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
+      localStorage.setItem(getUserKey(STORAGE_KEYS.PROFILE, uid), JSON.stringify(profile));
     }
 
     if (balSnap.exists()) {
       baseBalance = balSnap.data()?.amount ?? 0;
-      localStorage.setItem(STORAGE_KEYS.BASE_BALANCE, (baseBalance ?? 0).toString());
+      localStorage.setItem(getUserKey(STORAGE_KEYS.BASE_BALANCE, uid), (baseBalance ?? 0).toString());
     } else {
       baseBalance = 0;
-      localStorage.setItem(STORAGE_KEYS.BASE_BALANCE, '0');
+      localStorage.setItem(getUserKey(STORAGE_KEYS.BASE_BALANCE, uid), '0');
     }
 
     return { transactions, profile, baseBalance };

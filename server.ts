@@ -208,8 +208,34 @@ app.post('/api/admin/verify', (req, res) => {
   return res.status(401).json({ success: false, error: 'Admin paroli noto‘g‘ri!' });
 });
 
+// Rate limiter for AI receipt scanner API to protect Gemini quota against spam
+const scanRateLimitMap = new Map<string, { count: number; resetTime: number }>();
+
+const rateLimitScanReceipt = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const ip = (req.headers['x-forwarded-for'] as string || req.ip || 'unknown').split(',')[0].trim();
+  const now = Date.now();
+  const windowMs = 60 * 1000; // 1 minute window
+  const maxRequests = 10; // Max 10 scan requests per minute per IP
+
+  const record = scanRateLimitMap.get(ip);
+  if (!record || now > record.resetTime) {
+    scanRateLimitMap.set(ip, { count: 1, resetTime: now + windowMs });
+    return next();
+  }
+
+  if (record.count >= maxRequests) {
+    return res.status(429).json({
+      success: false,
+      error: "Skanerlash cheklovi: Minutiga ko'pi bilan 10 ta chek skanerlash mumkin. Iltimos 1 daqiqa kutib qaytadan urinib ko'ring."
+    });
+  }
+
+  record.count += 1;
+  next();
+};
+
 // AI Receipt Scanner API (Gemini Vision)
-app.post('/api/scan-receipt', async (req, res) => {
+app.post('/api/scan-receipt', rateLimitScanReceipt, async (req, res) => {
   try {
     const { imageBase64 } = req.body;
     if (!imageBase64 || typeof imageBase64 !== 'string') {
@@ -237,12 +263,12 @@ app.post('/api/scan-receipt', async (req, res) => {
 
     const ai = getGeminiClient();
 
-    const promptText = `Siz professional AI OCR va moliyaviy tahlilchisiz. Ushbu rasm mobil telefonda tushirilgan qog'oz kassa cheki, kassa kvitansiyasi, Soliq QR-chek, yoki Click / Payme / Uzum / Bank ilovasining xarid skrinshoti.
+    const promptText = `Siz professional AI OCR va moliyaviy tahlilchisiz. Ushbu rasm mobil telefonda tushirilgan qog'oz kassa cheki, kassa kvitansiyasi, Soliq QR-chek, UZCARD / HUMO POS-terminal cheki, yoki Click / Payme / Uzum / Bank ilovasining xarid skrinshoti.
 
 Rasmni diqqat bilan har bir qator va burchaklarini o'rganib chiqib, quyidagi ma'lumotlarni o'qing:
-1. Do'kon, tashkilot yoki ilova nomi (masalan: Korzinka, Makro, Havas, bi1, Click, Payme, Uzum, Yandex Go, Evos, Oqtepa Lavash, Apteka, Zapravka, va h.k.).
-2. JAMI yakuniy to'langan summa (JAMI / ИТОГО / TOTAL / SUMMA / To'landi / Summa).
-3. Barcha alohida xarid qilingan mahsulotlar (items) ro'yxati va ularning narxlari.
+1. Do'kon, tashkilot yoki xizmat nomi (masalan: Korzinka, Makro, Havas, bi1, Click, Payme, Uzum, Yandex Go, Evos, Oqtepa Lavash, Apteka, UZCARD, HUMO, Zapravka, va h.k.).
+2. JAMI yakuniy to'langan summa (JAMI / ИТОГО / TOTAL / SUMMA / SUMM / To'landi / Summa / KARTADAN YECHILDI / YECHILDI).
+3. Barcha alohida xarid qilingan mahsulotlar (items) ro'yxati va ularning narxlari. (Terminal chekida mahsulotlar bo'lmasa, JAMI summaning o'zini 1 ta item qilib kiriting).
 4. Xarid sanasi va vaqti.
 
 Javobni AYNAN va STRICTLY quyidagi JSON formatida qaytaring:
@@ -260,13 +286,12 @@ Javobni AYNAN va STRICTLY quyidagi JSON formatida qaytaring:
 }
 
 MUHIM TASHXIS VA O'QISH QOIDALARI (XIRA VA PAST SIFATLI CHEKLAR UCHUN):
-- Rasm xira, qorong'u, soyali, qiyshiq, qog'oz buklangan yoki o'chib ketgan thermal kassa qog'ozi bo'lsa ham, eng yaqin mos mantiqiy raqamlar va so'zlarni OCR orqali tiklang va toping.
-- Agar do'kon nomi xira bo'lsa, chekning eng yuqori qismidagi eng katta yozuvni yoki soliq rekvizitlarini tahlil qilib taxminiy nomni oling.
-- Agar mahsulotlar ro'yxatidan ba'zi qatorlar o'qilmasa, o'qiladiganlarini kiriting va eng muhim bo'lgan JAMI (TOTAL / ИТОГО) summani va do'kon nomini aniqlashga ustuvorlik bering.
-- "amount" qiymatida harf, so'm, probel yoki nuqtasiz FAQAT bitta musbat butun son qaytaring.
+- Rasm xira, qorong'u, soyali, qiyshiq, qog'oz buklangan yoki o'chib ketgan thermal kassa qog'ozi bo'lsa ham, barcha raqamlar va so'zlarni mantiqan toping.
+- UZCARD / HUMO terminal cheklarida "SUMMA:", "СУММА:", "TOTAL:", "YECHILDI:" so'zlarining yonidagi yoki ostidagi summani albatta o'qing.
+- "amount" har doim 0 dan katta musbat butun son bo'lsin.
 - JAVOB FAQAT TOZA JSON BO'LSIN, HECH QANDAY SHARH VA MARKDOWN BLOKSIZ.`;
 
-    const candidateModels = ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite'];
+    const candidateModels = ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
     let responseText = '';
     let lastError: any = null;
 
@@ -308,12 +333,14 @@ MUHIM TASHXIS VA O'QISH QOIDALARI (XIRA VA PAST SIFATLI CHEKLAR UCHUN):
 
     let parsedData = null;
     try {
-      parsedData = JSON.parse(responseText);
+      const cleanJsonStr = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
+      parsedData = JSON.parse(cleanJsonStr);
     } catch {
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         try {
-          parsedData = JSON.parse(jsonMatch[0]);
+          const sanitized = jsonMatch[0].replace(/[\u0000-\u001F\u007F-\u009F]/g, " ");
+          parsedData = JSON.parse(sanitized);
         } catch {
           // ignore
         }
@@ -324,12 +351,11 @@ MUHIM TASHXIS VA O'QISH QOIDALARI (XIRA VA PAST SIFATLI CHEKLAR UCHUN):
       return res.status(500).json({ success: false, error: "Chek ma'lumotlarini o'qib bo'lmadi." });
     }
 
-    // Helper to fix UZS amounts where thousands separator dot/space turned into a decimal float (e.g. 763.500 -> 763.5)
+    // Helper to fix UZS amounts where thousands separator dot/space turned into a decimal float (e.g. 763.500 -> 763500)
     const normalizeUzsAmount = (val: any): number => {
       if (val === null || val === undefined) return 0;
       if (typeof val === 'number') {
         if (isNaN(val) || val <= 0) return 0;
-        // If float < 1000 with decimals (e.g. 763.5 or 12.5 or 763.500)
         if (val < 1000 && !Number.isInteger(val)) {
           const strVal = val.toString();
           const parts = strVal.split('.');
@@ -375,10 +401,11 @@ MUHIM TASHXIS VA O'QISH QOIDALARI (XIRA VA PAST SIFATLI CHEKLAR UCHUN):
       totalAmount = itemsSum;
     }
 
-    // 4. Ultimate Fallback: scan description or responseText for any valid numbers >= 500
+    // 4. Ultimate Fallback: scan description or responseText for any valid numbers with spaces/dots/commas
     if (!totalAmount || totalAmount === 0) {
       const fullText = (responseText + ' ' + (parsedData.description || '') + ' ' + (parsedData.title || ''));
-      const foundNumbers = fullText.match(/\b\d{4,9}\b/g);
+      const normalizedText = fullText.replace(/(\d+)[,.\s]+(\d{3})/g, '$1$2').replace(/(\d+)[,.\s]+(\d{3})/g, '$1$2');
+      const foundNumbers = normalizedText.match(/\b\d{4,9}\b/g);
       if (foundNumbers && foundNumbers.length > 0) {
         const parsedNums = foundNumbers.map(n => parseInt(n, 10)).filter(n => n >= 500 && n <= 100000000);
         if (parsedNums.length > 0) {

@@ -271,12 +271,40 @@ export const triggerInstantNotification = async (
       onShowInWebToast(bodyText);
     }
   } else {
-    // Try browser Notifications API
-    if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification('💬 SmartBudget SMS-Xabarnoma', {
-        body: bodyText,
-        icon: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%230ea5e9"/><circle cx="50" cy="50" r="30" fill="white"/></svg>'
-      });
+    // Try browser Notifications API with permission request and ServiceWorker support for phones
+    if ('Notification' in window) {
+      try {
+        let perm = Notification.permission;
+        if (perm === 'default') {
+          perm = await Notification.requestPermission();
+        }
+
+        if (perm === 'granted') {
+          // Vibration feedback on supported mobile devices
+          if ('vibrate' in navigator) {
+            try { navigator.vibrate([200, 100, 200]); } catch {}
+          }
+
+          // Try Service Worker showNotification first (best for Android/PWA mobile)
+          if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            const reg = await navigator.serviceWorker.ready;
+            if (reg && reg.showNotification) {
+              await reg.showNotification('💬 SmartBudget SMS-Xabarnoma', {
+                body: bodyText,
+                badge: '/icon.png',
+                vibrate: [200, 100, 200],
+                tag: 'daily-summary',
+              } as any);
+            } else {
+              new Notification('💬 SmartBudget SMS-Xabarnoma', { body: bodyText });
+            }
+          } else {
+            new Notification('💬 SmartBudget SMS-Xabarnoma', { body: bodyText });
+          }
+        }
+      } catch (err) {
+        console.warn('Browser Notification error:', err);
+      }
     }
     // Also show our beautiful custom web in-app toast
     onShowInWebToast(bodyText);

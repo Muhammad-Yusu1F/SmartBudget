@@ -31,7 +31,10 @@ import {
   Palette,
   Heart,
   Leaf,
-  Crown
+  Crown,
+  Eye,
+  Share2,
+  X
 } from 'lucide-react';
 import { 
   triggerInstantNotification, 
@@ -291,6 +294,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   };
 
   const [pendingImportData, setPendingImportData] = useState<any | null>(null);
+  const [pdfExportInfo, setPdfExportInfo] = useState<{ filename: string; blobUrl: string; pdfFile: File } | null>(null);
 
   const handleExport = async () => {
     let parsedTxs: Transaction[] = [];
@@ -311,7 +315,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     };
 
     onShowWebToast?.("📄 PDF hisoboti shakllantirilmoqda...");
-    await exportPDFReport(parsedTxs, currentProfile, baseBalance);
+    const result = await exportPDFReport(parsedTxs, currentProfile, baseBalance);
+    if (result) {
+      setPdfExportInfo({
+        filename: result.filename,
+        blobUrl: result.blobUrl,
+        pdfFile: result.pdfFile,
+      });
+    }
     onShowWebToast?.("✅ PDF hisoboti tayyor bo'ldi!");
   };
 
@@ -903,6 +914,100 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           </button>
         )}
       </div>
+
+      {/* PDF Location Guide & Direct Actions Modal */}
+      {pdfExportInfo && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#111827] text-gray-900 dark:text-white rounded-3xl p-5 max-w-sm w-full shadow-2xl border border-gray-100 dark:border-white/10 flex flex-col gap-4 relative overflow-hidden">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-white/10">
+              <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-extrabold text-sm">
+                <div className="p-2 bg-emerald-500/10 rounded-xl">
+                  <FileText size={20} className="text-emerald-500" />
+                </div>
+                <span>PDF Hisobot Yuklandi!</span>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setPdfExportInfo(null)}
+                className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Explanatory Info Card */}
+            <div className="bg-indigo-50/80 dark:bg-indigo-950/40 rounded-2xl p-3.5 border border-indigo-100 dark:border-indigo-900/50 flex flex-col gap-2.5">
+              <h4 className="font-bold text-xs text-indigo-900 dark:text-indigo-200 flex items-center gap-1.5">
+                <span>📱</span> Telefonda fayl qayerga tushdi?
+              </h4>
+
+              {/* Android Instructions */}
+              <div className="text-[11px] text-gray-700 dark:text-gray-300 space-y-1">
+                <p className="font-extrabold text-indigo-700 dark:text-indigo-300 flex items-center gap-1">
+                  <span>🤖</span> Android (Samsung, Redmi, Honor va b.):
+                </p>
+                <p className="pl-4 leading-relaxed">
+                  <strong>"Mening fayllarim" (My Files / Файлы)</strong> ilovasiga kiring ➔ <strong>"Yuklamalar" (Downloads / Загрузки)</strong> papkasini oching. U yerda <code className="bg-white/80 dark:bg-black/40 px-1.5 py-0.5 rounded text-[10px] font-mono text-indigo-600 dark:text-indigo-300">{pdfExportInfo.filename}</code> nomli fayl tayyor!
+                </p>
+              </div>
+
+              {/* iPhone Instructions */}
+              <div className="text-[11px] text-gray-700 dark:text-gray-300 space-y-1 pt-1.5 border-t border-indigo-100/60 dark:border-indigo-900/40">
+                <p className="font-extrabold text-indigo-700 dark:text-indigo-300 flex items-center gap-1">
+                  <span>🍏</span> iPhone (iOS) telefonlarda:
+                </p>
+                <p className="pl-4 leading-relaxed">
+                  <strong>"Файлы" (Files)</strong> ilovasini oching ➔ <strong>"Загрузки" (Downloads)</strong> papkasiga tushadi yoki Safari brauzerining pastki chap burchagidagi yuklamalar belgisida ko'rinadi.
+                </p>
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="flex flex-col gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  window.open(pdfExportInfo.blobUrl, '_blank');
+                }}
+                className="w-full py-3 bg-[#2116d0] hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-500/20 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Eye size={16} />
+                <span>PDF Faylini Hozir Ochish / Ko'rish</span>
+              </button>
+
+              {typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [pdfExportInfo.pdfFile] }) && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await navigator.share({
+                        files: [pdfExportInfo.pdfFile],
+                        title: 'SmartBudget Hisoboti',
+                        text: 'SmartBudget PDF Hisoboti',
+                      });
+                    } catch (e) {}
+                  }}
+                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Share2 size={16} />
+                  <span>Telegram / WhatsApp da Yuborish</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setPdfExportInfo(null)}
+                className="w-full py-2 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/15 text-gray-700 dark:text-gray-200 rounded-xl text-xs font-bold transition-all cursor-pointer text-center"
+              >
+                Tushundim (Yopish)
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 };

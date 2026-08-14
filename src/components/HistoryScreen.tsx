@@ -25,7 +25,8 @@ import {
   Coins,
   Lock,
   Camera,
-  Pencil
+  Pencil,
+  FileSpreadsheet
 } from 'lucide-react';
 import { Transaction, TransactionType } from '../types';
 import { CategoryIcon, getCategoryStyles } from './CategoryIcon';
@@ -235,6 +236,39 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
     setSelectedDate('');
   };
 
+  const handleExportCsv = () => {
+    const listToExport = historyTab === 'filters' ? filteredTransactions : sortedTxs;
+    if (!listToExport || listToExport.length === 0) {
+      alert("Yuklab olish uchun ma'lumotlar mavjud emas.");
+      return;
+    }
+
+    const headers = ["ID", "Sana", "Vaqt", "Turi", "Sarlavha", "Turkum", "Summa (UZS)", "Izoh"];
+    const rows = listToExport.map(tx => [
+      `"${tx.id}"`,
+      `"${tx.date}"`,
+      `"${tx.time}"`,
+      `"${tx.type === 'kirim' ? 'Kirim' : 'Chiqim'}"`,
+      `"${(tx.title || '').replace(/"/g, '""')}"`,
+      `"${(tx.category || '').replace(/"/g, '""')}"`,
+      tx.type === 'kirim' ? tx.amount : -tx.amount,
+      `"${(tx.description || '').replace(/"/g, '""')}"`
+    ]);
+
+    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    const dateStr = new Date().toISOString().split('T')[0];
+    link.setAttribute('href', url);
+    link.setAttribute('download', `SmartBudget_Hisobot_${historyTab}_${dateStr}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const isFiltered = searchTerm !== '' || selectedType !== 'barchasi' || selectedCategory !== 'Barchasi' || selectedDate !== '';
 
   return (
@@ -252,15 +286,26 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
           </p>
         </div>
         
-        {historyTab === 'filters' && isFiltered && (
+        <div className="flex items-center gap-2 self-start sm:self-center">
           <button 
-            onClick={clearFilters}
-            className="self-start sm:self-center flex items-center gap-1.5 text-xs font-bold text-rose-500 hover:text-rose-600 cursor-pointer active:scale-95 duration-100 bg-rose-50 dark:bg-rose-500/10 px-3 py-1.5 rounded-xl border border-rose-500/10"
+            onClick={handleExportCsv}
+            className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-300 hover:text-emerald-800 dark:hover:text-emerald-200 cursor-pointer active:scale-95 duration-100 bg-emerald-500/10 hover:bg-emerald-500/20 px-3 py-1.5 rounded-xl border border-emerald-500/20 shadow-sm"
+            title="Xarajatlar ro'yxatini Excel/CSV faylida yuklab olish"
           >
-            <X size={14} />
-            <span>Filtrlarni tozalash</span>
+            <FileSpreadsheet size={15} className="text-emerald-500" />
+            <span>Excel (CSV) Yuklab olish</span>
           </button>
-        )}
+
+          {historyTab === 'filters' && isFiltered && (
+            <button 
+              onClick={clearFilters}
+              className="flex items-center gap-1.5 text-xs font-bold text-rose-500 hover:text-rose-600 cursor-pointer active:scale-95 duration-100 bg-rose-50 dark:bg-rose-500/10 px-3 py-1.5 rounded-xl border border-rose-500/10"
+            >
+              <X size={14} />
+              <span>Tozalash</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Primary Navigation Segmented Tabs for History tab */}

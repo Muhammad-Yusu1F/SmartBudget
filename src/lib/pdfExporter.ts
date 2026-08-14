@@ -212,13 +212,13 @@ export const exportPDFReport = async (
 
   // Save or share the generated PDF file across desktop and mobile devices
   const filename = `smartbudget_hisobot_${new Date().toISOString().split('T')[0]}.pdf`;
+  const pdfBlob = doc.output('blob');
+  const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
+  const blobUrl = URL.createObjectURL(pdfBlob);
   
   try {
     // 1. Primary: Standard jsPDF download trigger
     doc.save(filename);
-
-    const pdfBlob = doc.output('blob');
-    const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
 
     // 2. Web Share API (native share/save to Files/Drive/Gallery on iOS Safari & Android Chrome)
     if (typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
@@ -228,30 +228,15 @@ export const exportPDFReport = async (
           title: 'SmartBudget Hisoboti',
           text: `${cleanText(profile.name) || 'Foydalanuvchi'}ning SmartBudget hisoboti (PDF)`,
         });
-        return;
       } catch (shareErr: any) {
-        if (shareErr.name === 'AbortError') return;
+        if (shareErr.name === 'AbortError') console.log('Share prompt dismissed by user');
       }
     }
-
-    // 3. Fallback: Blob URL window open / link click for iframe preview sandbox
-    const blobUrl = URL.createObjectURL(pdfBlob);
-    const openedWin = window.open(blobUrl, '_blank');
-    if (!openedWin) {
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = filename;
-      link.target = '_blank';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
-
-    setTimeout(() => {
-      URL.revokeObjectURL(blobUrl);
-    }, 15000);
   } catch (err) {
     console.error('PDF generation or download error:', err);
     doc.save(filename);
   }
+
+  return { filename, pdfBlob, pdfFile, blobUrl };
 };
+

@@ -53,6 +53,31 @@ export default function App() {
   const [baseBalance, setBaseBalance] = useState<number>(getBaseBalance());
   const [transactions, setTransactions] = useState<Transaction[]>(getTransactions());
 
+  // Network Offline / Online indicator state
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [showBackOnlineToast, setShowBackOnlineToast] = useState(false);
+
+  useEffect(() => {
+    const handleOffline = () => {
+      setIsOffline(true);
+      setShowBackOnlineToast(false);
+    };
+    const handleOnline = () => {
+      setIsOffline(false);
+      setShowBackOnlineToast(true);
+      const timer = setTimeout(() => setShowBackOnlineToast(false), 4000);
+      return () => clearTimeout(timer);
+    };
+
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('online', handleOnline);
+
+    return () => {
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, []);
+
   // Listen to Firebase Auth state changes & sync Firestore
   useEffect(() => {
     setStorageErrorCallback((msg) => {
@@ -682,6 +707,27 @@ export default function App() {
       {/* Main App interface when authenticated or continuing in guest mode */}
       {!showSplash && (!isAuthLoading && (authUser || isGuestMode)) && (
         <>
+          {/* Offline / Online Network Status Banners */}
+          {isOffline && (
+            <div className="fixed top-2 left-3 right-3 z-[99999] max-w-md mx-auto bg-amber-500/95 dark:bg-amber-600/95 text-white backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-xl flex items-center justify-between gap-3 text-xs font-bold animate-in slide-in-from-top-4 duration-300 border border-amber-300/30">
+              <div className="flex items-center gap-2.5">
+                <span className="relative flex h-2.5 w-2.5 shrink-0">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
+                </span>
+                <span>📡 Internet uzildi. Ma'lumotlar qurilmangizda xavfsiz saqlanmoqda.</span>
+              </div>
+            </div>
+          )}
+
+          {showBackOnlineToast && !isOffline && (
+            <div className="fixed top-2 left-3 right-3 z-[99999] max-w-md mx-auto bg-emerald-600/95 text-white backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-xl flex items-center justify-between gap-3 text-xs font-bold animate-in slide-in-from-top-4 duration-300 border border-emerald-300/30">
+              <div className="flex items-center gap-2.5">
+                <span>✅ Internet qaytdi. Ma'lumotlar bulut bilan sinxronlandi!</span>
+              </div>
+            </div>
+          )}
+
           {/* Dynamic SMS Notification Banner Simulation */}
       {webToastMessage && (
         <div className="fixed top-4 left-4 right-4 z-[9999] max-w-sm mx-auto bg-gray-900/95 dark:bg-[#1e293b]/95 backdrop-blur-md rounded-2xl p-4 shadow-2xl border border-white/10 text-white animate-in slide-in-from-top-12 duration-300">

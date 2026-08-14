@@ -108,54 +108,69 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
   // Mobile-optimized image processor & compressor for high-accuracy AI receipt OCR
   const compressImage = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target?.result as string;
-        img.onload = () => {
-          try {
-            const canvas = document.createElement('canvas');
-            const MAX_WIDTH = 1200;
-            const MAX_HEIGHT = 1600;
-            let width = img.width;
-            let height = img.height;
+    return new Promise((resolve) => {
+      let blobUrl = '';
+      try {
+        blobUrl = URL.createObjectURL(file);
+      } catch {
+        blobUrl = '';
+      }
 
-            if (width > height) {
-              if (width > MAX_WIDTH) {
-                height = Math.round(height * (MAX_WIDTH / width));
-                width = MAX_WIDTH;
-              }
-            } else {
-              if (height > MAX_HEIGHT) {
-                width = Math.round(width * (MAX_HEIGHT / height));
-                height = MAX_HEIGHT;
-              }
-            }
-
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-              ctx.imageSmoothingEnabled = true;
-              ctx.imageSmoothingQuality = 'high';
-              ctx.drawImage(img, 0, 0, width, height);
-            }
-            // JPEG quality 0.82 ensures lightweight payload (~180KB) and crisp OCR contrast on mobile
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
-            resolve(dataUrl);
-          } catch (err) {
-            // Fallback to original raw dataUrl if canvas fails
-            resolve(event.target?.result as string);
-          }
-        };
-        img.onerror = () => {
-          // If image load fails, attempt direct FileReader result
-          resolve(event.target?.result as string);
-        };
+      const fallbackWithReader = () => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target?.result as string || '');
+        reader.onerror = () => resolve('');
+        reader.readAsDataURL(file);
       };
-      reader.onerror = (err) => reject(err);
+
+      if (!blobUrl) {
+        fallbackWithReader();
+        return;
+      }
+
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1200;
+          const MAX_HEIGHT = 1600;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height = Math.round(height * (MAX_WIDTH / width));
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width = Math.round(width * (MAX_HEIGHT / height));
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, 0, 0, width, height);
+          }
+          // JPEG quality 0.80 ensures lightweight payload (~100KB-150KB) and ultra-fast mobile upload
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.80);
+          URL.revokeObjectURL(blobUrl);
+          resolve(dataUrl);
+        } catch (err) {
+          URL.revokeObjectURL(blobUrl);
+          fallbackWithReader();
+        }
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(blobUrl);
+        fallbackWithReader();
+      };
+      img.src = blobUrl;
     });
   };
 
@@ -173,7 +188,6 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
     try {
       const compressedBase64 = await compressImage(file);
-      setReceiptImage(compressedBase64);
 
       let response;
       try {
@@ -192,12 +206,24 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       let resData: any = null;
 
       try {
-        resData = JSON.parse(responseText);
+        const cleanText = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
+        resData = JSON.parse(cleanText);
       } catch {
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          try {
+            resData = JSON.parse(jsonMatch[0]);
+          } catch {
+            // failed
+          }
+        }
+      }
+
+      if (!resData) {
         if (response.status === 413) {
           throw new Error("Rasm hajmi juda katta. Iltimos qaytadan rasmga oling.");
         }
-        throw new Error(`Server xatosi (${response.status}): Chek ma'lumotlarini o'qib bo'lmadi.`);
+        throw new Error("Chek ma'lumotlarini o'qib bo'lmadi. Iltimos rasmni aniqroq oling.");
       }
 
       if (!response.ok || !resData || !resData.success) {
@@ -205,6 +231,9 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       }
 
       const data = resData.data;
+
+      // Only set receipt image after successful response
+      setReceiptImage(compressedBase64);
 
       // Intelligent title assignment
       const detectedCategory = detectCategoryFromAI(data.category, data.title, data.items);
@@ -288,10 +317,15 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         setShowItemsEditor(true);
       }
 
-      setScanSuccessMsg(`✨ AI Chek tahlil qilindi! Do'kon: "${finalTitle}", Summa: ${rawAmount ? formatInput(rawAmount.toString()) : '0'} ${currency}`);
+      if (rawAmount > 0) {
+        setScanSuccessMsg(`✨ AI Chek tahlil qilindi! Do'kon: "${finalTitle}", Summa: ${formatInput(rawAmount.toString())} ${currency}`);
+      } else {
+        setScanSuccessMsg(`✨ AI Chek tahlil qilindi! Do'kon: "${finalTitle}". Iltimos summani tekshiring.`);
+      }
     } catch (err: any) {
       console.error("Scan receipt error:", err);
-      setError(err?.message || "Chekni AI tahlil qilishda xatolik. Rasmni saqlab, ma'lumotlarni qo'lda kiritishingiz mumkin.");
+      setError(err?.message || "Chekni AI tahlil qilishda xatolik yuz berdi.");
+      setReceiptImage(null);
     } finally {
       setIsScanning(false);
       if (e.target) e.target.value = '';
